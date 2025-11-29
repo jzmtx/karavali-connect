@@ -1,0 +1,406 @@
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { supabase } from '../lib/supabase'
+import { uploadImage } from '../services/cloudinary'
+import { detectTrash, verifyCleanup } from '../services/ai'
+import { config } from '../lib/config'
+import CameraCapture from './CameraCapture'
+
+export default function BeachCleanup({ user, onUpdate }) {
+  const [step, setStep] = useState('start') // 'start', 'before', 'cleaning', 'after', 'done'
+  const [beforeImage, setBeforeImage] = useState(null)
+  const [afterImage, setAfterImage] = useState(null)
+  const [beforeImageUrl, setBeforeImageUrl] = useState(null)
+  const [afterImageUrl, setAfterImageUrl] = useState(null)
+  const timerRef = useRef(null)
+  const beforeUrlRef = useRef(null)
+  const afterUrlRef = useRef(null)
+  const [startTime, setStartTime] = useState(null)
+  const [elapsedTime, setElapsedTime] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+  const [aiResult, setAiResult] = useState(null)
+  const [showCamera, setShowCamera] = useState(false)
+  const [cameraMode, setCameraMode] = useState(null) // 'before' or 'after'
+
+  const startCleanup = () => {
+    setStep('before')
+    setCameraMode('before')
+    setShowCamera(true)
+    setMessage('Take a photo of the area with trash')
+  }
+
+  const handleBeforeCapture = async (file) => {
+    setLoading(true)
+    setError('')
+    setShowCamera(false)
+
+    try {
+      // Clean up previous URL if exists
+      if (beforeUrlRef.current) {
+        URL.revokeObjectURL(beforeUrlRef.current)
+      }
+      
+      const imageUrl = URL.createObjectURL(file)
+      beforeUrlRef.current = imageUrl
+      setBeforeImageUrl(imageUrl)
+      setBeforeImage(file)
+
+      // Create image element for AI
+      const img = new Image()
+      img.src = imageUrl
+
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+      })
+
+      // AI Detection
+      const result = await detectTrash(img)
+      setAiResult(result)
+
+      if (!result.trashDetected) {
+        setError('No trash detected in the image. Please take a photo of an area with visible trash.')
+        setLoading(false)
+        // Clean up URL
+        if (beforeUrlRef.current) {
+          URL.revokeObjectURL(beforeUrlRef.current)
+          beforeUrlRef.current = null
+        }
+        setBeforeImageUrl(null)
+        setBeforeImage(null)
+        return
+      }
+
+      setMessage(`✅ Trash detected! ${result.predictions.length} items found. Timer started - clean for at least 5 minutes.`)
+      setStep('cleaning')
+      const now = Date.now()
+      setStartTime(now)
+
+    } catch (err) {
+      setError(err.message || 'Failed to process image')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (step === 'cleaning' && startTime) {
+      timerRef.current = setInterval(() => {
+        const elapsed = Date.now() - startTime
+        setElapsedTime(elapsed)
+      }, 1000)
+
+      return () => {
+        if (timerRef.current) {
+          clearInterval(timerRef.current)
+          timerRef.current = null
+        }
+      }
+    }
+  }, [step, startTime])
+
+  const finishCleanup = async () => {
+    if (elapsedTime < config.cleanupMinTime) {
+      const remaining = Math.ceil((config.cleanupMinTime - elapsedTime) / 1000 / 60)
+      setError(`Please clean for at least 5 minutes. ${remaining} minute(s) remaining.`)
+      return
+    }
+
+    setStep('after')
+    setCameraMode('after')
+    setShowCamera(true)
+    setMessage('Take a photo of the cleaned area')
+  }
+
+  const handleAfterCapture = async (file) => {
+    setLoading(true)
+    setError('')
+    setShowCamera(false)
+
+    try {
+      // Clean up previous URL if exists
+      if (afterUrlRef.current) {
+        URL.revokeObjectURL(afterUrlRef.current)
+      }
+      
+      const imageUrl = URL.createObjectURL(file)
+      afterUrlRef.current = imageUrl
+      setAfterImageUrl(imageUrl)
+      setAfterImage(file)
+
+      const img = new Image()
+      img.src = imageUrl
+
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+      })
+
+      // AI Verification
+      const result = await verifyCleanup(img)
+
+      if (!result.isClean) {
+        setError(`Cleanup incomplete. Still detected ${result.trashCount} trash items. Please clean more thoroughly.`)
+        setLoading(false)
+        // Clean up URL
+        if (afterUrlRef.current) {
+          URL.revokeObjectURL(afterUrlRef.current)
+          afterUrlRef.current = null
+        }
+        setAfterImageUrl(null)
+        setAfterImage(null)
+        return
+      }
+
+      // Get location
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject)
+      })
+
+      // Upload images
+      const beforeUrl = await uploadImage(beforeImage)
+      const afterUrl = await uploadImage(afterImage)
+
+      // Create report
+      const { error: reportError } = await supabase
+        .from('reports')
+        .insert({
+          user_id: user.id,
+          type: 'cleanup',
+          status: 'verified',
+          gps_lat: position.coords.latitude,
+          gps_lng: position.coords.longitude,
+          image_before_url: beforeUrl,
+          image_after_url: afterUrl,
+          coins_awarded: 50
+        })
+
+      if (reportError) throw reportError
+
+      // Award coins immediately
+      await supabase.rpc('increment_coins', {
+        user_id_param: user.id,
+        coins_param: 50
+      })
+
+      // Create transaction record
+      await supabase
+        .from('transactions')
+        .insert({
+          user_id: user.id,
+          type: 'earned',
+          coins_amount: 50,
+          description: 'Beach cleanup verified'
+        })
+
+      setMessage('🎉 Cleanup verified! You earned 50 coins!')
+      setStep('done')
+      onUpdate()
+
+    } catch (err) {
+      setError(err.message || 'Failed to verify cleanup')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (beforeUrlRef.current) {
+        URL.revokeObjectURL(beforeUrlRef.current)
+      }
+      if (afterUrlRef.current) {
+        URL.revokeObjectURL(afterUrlRef.current)
+      }
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+      }
+    }
+  }, [])
+
+  const reset = () => {
+    // Clean up URLs
+    if (beforeUrlRef.current) {
+      URL.revokeObjectURL(beforeUrlRef.current)
+      beforeUrlRef.current = null
+    }
+    if (afterUrlRef.current) {
+      URL.revokeObjectURL(afterUrlRef.current)
+      afterUrlRef.current = null
+    }
+    
+    // Clean up timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+    
+    setStep('start')
+    setBeforeImage(null)
+    setAfterImage(null)
+    setBeforeImageUrl(null)
+    setAfterImageUrl(null)
+    setStartTime(null)
+    setElapsedTime(0)
+    setMessage('')
+    setError('')
+    setAiResult(null)
+  }
+
+  const formatTime = (ms) => {
+    const minutes = Math.floor(ms / 60000)
+    const seconds = Math.floor((ms % 60000) / 1000)
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`
+  }
+
+  return (
+    <div style={{
+      background: 'white',
+      padding: '1.5rem',
+      borderRadius: '12px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+      maxWidth: '500px',
+      margin: '0 auto'
+    }}>
+      <h2 style={{ marginBottom: '1rem', color: '#1e40af' }}>🧹 Beach Cleanup</h2>
+
+      {error && (
+        <div style={{
+          background: '#fee2e2',
+          color: '#dc2626',
+          padding: '0.75rem',
+          borderRadius: '8px',
+          marginBottom: '1rem'
+        }}>
+          {error}
+        </div>
+      )}
+
+      {message && (
+        <div style={{
+          background: '#d1fae5',
+          color: '#065f46',
+          padding: '0.75rem',
+          borderRadius: '8px',
+          marginBottom: '1rem'
+        }}>
+          {message}
+        </div>
+      )}
+
+      {step === 'start' && (
+        <div>
+          <p style={{ marginBottom: '1rem', color: '#6b7280' }}>
+            Clean a beach area and earn 50 coins! AI will verify your work.
+          </p>
+          <button
+            onClick={startCleanup}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              background: '#1e40af',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '1rem',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            Start Cleanup
+          </button>
+        </div>
+      )}
+
+      {showCamera && (
+        <CameraCapture
+          onCapture={cameraMode === 'before' ? handleBeforeCapture : handleAfterCapture}
+          onClose={() => setShowCamera(false)}
+        />
+      )}
+
+      {step === 'cleaning' && (
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            fontSize: '3rem',
+            marginBottom: '1rem'
+          }}>
+            ⏱️
+          </div>
+          <div style={{
+            fontSize: '2rem',
+            fontWeight: '600',
+            color: '#1e40af',
+            marginBottom: '1rem'
+          }}>
+            {formatTime(elapsedTime)}
+          </div>
+          <p style={{ marginBottom: '1rem', color: '#6b7280' }}>
+            Keep cleaning! Minimum 5 minutes required.
+          </p>
+          {elapsedTime >= config.cleanupMinTime && (
+            <button
+              onClick={finishCleanup}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                background: '#10b981',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '1rem',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              Finished Cleaning
+            </button>
+          )}
+        </div>
+      )}
+
+      {step === 'done' && (
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🎉</div>
+          <h3 style={{ marginBottom: '1rem' }}>Cleanup Complete!</h3>
+          <p style={{ marginBottom: '1rem', color: '#6b7280' }}>
+            You earned 50 coins!
+          </p>
+          <button
+            onClick={reset}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              background: '#1e40af',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '1rem',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            Start Another Cleanup
+          </button>
+        </div>
+      )}
+
+      {beforeImageUrl && (
+        <div style={{ marginTop: '1rem' }}>
+          <p><strong>Before:</strong></p>
+          <img src={beforeImageUrl} alt="Before" style={{ width: '100%', borderRadius: '8px' }} />
+        </div>
+      )}
+
+      {afterImageUrl && (
+        <div style={{ marginTop: '1rem' }}>
+          <p><strong>After:</strong></p>
+          <img src={afterImageUrl} alt="After" style={{ width: '100%', borderRadius: '8px' }} />
+        </div>
+      )}
+    </div>
+  )
+}
+
