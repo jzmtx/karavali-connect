@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { getMarineWeather } from '../services/weather'
+import { getBeachConditions } from '../services/weather'
 import { supabase } from '../lib/supabase'
 
 // Fix for default marker icons in Leaflet
@@ -17,7 +17,7 @@ export default function MapViewLeaflet({ user }) {
   const map = useRef(null)
   const [safetyPins, setSafetyPins] = useState([])
   const [selectedPin, setSelectedPin] = useState(null)
-  const [weather, setWeather] = useState(null)
+  const [beachConditions, setBeachConditions] = useState(null)
   const [mapError, setMapError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
@@ -67,7 +67,7 @@ export default function MapViewLeaflet({ user }) {
 
           if (nearbyPin) {
             setSelectedPin(nearbyPin)
-            loadWeather(nearbyPin.gps_lat, nearbyPin.gps_lng)
+            loadBeachConditions(nearbyPin.gps_lat, nearbyPin.gps_lng)
           } else {
             // Create new pin on click
             const newPin = {
@@ -77,7 +77,7 @@ export default function MapViewLeaflet({ user }) {
               danger_level: 'low'
             }
             setSelectedPin(newPin)
-            loadWeather(lat, lng)
+            loadBeachConditions(lat, lng)
           }
         })
       } catch (error) {
@@ -124,7 +124,7 @@ export default function MapViewLeaflet({ user }) {
 
       marker.on('click', () => {
         setSelectedPin(pin)
-        loadWeather(pin.gps_lat, pin.gps_lng)
+        loadBeachConditions(pin.gps_lat, pin.gps_lng)
       })
     })
   }, [safetyPins])
@@ -150,9 +150,9 @@ export default function MapViewLeaflet({ user }) {
     }
   }
 
-  const loadWeather = async (lat, lng) => {
-    const weatherData = await getMarineWeather(lat, lng)
-    setWeather(weatherData)
+  const loadBeachConditions = async (lat, lng) => {
+    const conditions = await getBeachConditions(lat, lng)
+    setBeachConditions(conditions)
   }
 
   const getDistance = (lat1, lng1, lat2, lng2) => {
@@ -188,53 +188,84 @@ export default function MapViewLeaflet({ user }) {
 
     setIsSearching(true)
     try {
-      // Try multiple search approaches for better results
-      const searches = [
-        `${query} beach Karnataka`,
-        `${query} coast Karnataka`,
-        `${query} Karnataka India`
+      // Predefined beach locations for better results
+      const knownBeaches = [
+        { name: 'Malpe Beach', lat: 13.3503, lng: 74.7042, district: 'Udupi' },
+        { name: 'Kaup Beach', lat: 13.2333, lng: 74.7500, district: 'Udupi' },
+        { name: 'Panambur Beach', lat: 12.8625, lng: 74.8097, district: 'Mangalore' },
+        { name: 'Tannirbhavi Beach', lat: 12.8333, lng: 74.8000, district: 'Mangalore' },
+        { name: 'Gokarna Beach', lat: 14.5492, lng: 74.3200, district: 'Uttara Kannada' },
+        { name: 'Om Beach', lat: 14.5333, lng: 74.3167, district: 'Gokarna' },
+        { name: 'Kudle Beach', lat: 14.5400, lng: 74.3150, district: 'Gokarna' },
+        { name: 'Half Moon Beach', lat: 14.5350, lng: 74.3100, district: 'Gokarna' },
+        { name: 'Paradise Beach', lat: 14.5300, lng: 74.3050, district: 'Gokarna' },
+        { name: 'Murudeshwar Beach', lat: 14.0942, lng: 74.4850, district: 'Bhatkal' },
+        { name: 'Karwar Beach', lat: 14.8142, lng: 74.1297, district: 'Karwar' },
+        { name: 'Devbagh Beach', lat: 14.8500, lng: 74.1000, district: 'Karwar' },
+        { name: 'Murdeshwar Temple Beach', lat: 14.0942, lng: 74.4850, district: 'Bhatkal' },
+        { name: 'Kundapura Beach', lat: 13.6167, lng: 74.6833, district: 'Kundapura' },
+        { name: 'Maravanthe Beach', lat: 13.6000, lng: 74.7000, district: 'Kundapura' },
+        { name: 'Ullal Beach', lat: 12.8000, lng: 74.8667, district: 'Mangalore' },
+        { name: 'Surathkal Beach', lat: 13.0167, lng: 74.7833, district: 'Mangalore' },
+        { name: 'Someshwar Beach', lat: 12.7833, lng: 74.8833, district: 'Mangalore' }
       ]
-      
-      let allResults = []
-      
-      for (const searchTerm of searches) {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchTerm)}&limit=5&countrycodes=in`
+
+      // Filter known beaches first
+      const matchingBeaches = knownBeaches.filter(beach => 
+        beach.name.toLowerCase().includes(query.toLowerCase()) ||
+        beach.district.toLowerCase().includes(query.toLowerCase())
+      )
+
+      let results = matchingBeaches.map(beach => ({
+        name: beach.name,
+        fullName: `${beach.name}, ${beach.district}, Karnataka`,
+        lat: beach.lat,
+        lng: beach.lng
+      }))
+
+      // If no known beaches match, search online
+      if (results.length === 0) {
+        const searches = [
+          `${query} beach Karnataka India`,
+          `${query} coast Karnataka`,
+          `${query} Karnataka beach`
+        ]
+        
+        let allResults = []
+        
+        for (const searchTerm of searches) {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchTerm)}&limit=3&countrycodes=in&bounded=1&viewbox=73.5,15.5,75.5,11.5`
+          )
+          const data = await response.json()
+          allResults = [...allResults, ...data]
+        }
+        
+        // Remove duplicates and filter for coastal areas
+        const uniqueResults = allResults.filter((item, index, self) => 
+          index === self.findIndex(t => t.place_id === item.place_id)
         )
-        const data = await response.json()
-        allResults = [...allResults, ...data]
+        
+        const coastalResults = uniqueResults.filter(item => {
+          const name = item.display_name.toLowerCase()
+          const type = item.type?.toLowerCase() || ''
+          return name.includes('beach') || 
+                 name.includes('coast') || 
+                 name.includes('shore') || 
+                 name.includes('bay') || 
+                 name.includes('karnataka') ||
+                 type.includes('beach')
+        })
+        
+        results = coastalResults.slice(0, 5).map(item => ({
+          name: item.display_name.split(',')[0],
+          fullName: item.display_name,
+          lat: parseFloat(item.lat),
+          lng: parseFloat(item.lon)
+        }))
       }
       
-      // Remove duplicates and filter for coastal areas
-      const uniqueResults = allResults.filter((item, index, self) => 
-        index === self.findIndex(t => t.place_id === item.place_id)
-      )
-      
-      const coastalResults = uniqueResults.filter(item => {
-        const name = item.display_name.toLowerCase()
-        const type = item.type?.toLowerCase() || ''
-        return name.includes('beach') || 
-               name.includes('coast') || 
-               name.includes('shore') || 
-               name.includes('bay') || 
-               name.includes('port') || 
-               name.includes('malpe') ||
-               name.includes('udupi') ||
-               name.includes('mangalore') ||
-               name.includes('karwar') ||
-               name.includes('gokarna') ||
-               name.includes('murudeshwar') ||
-               type.includes('beach')
-      })
-      
-      const results = coastalResults.slice(0, 5).map(item => ({
-        name: item.display_name.split(',')[0], // Show shorter name
-        fullName: item.display_name,
-        lat: parseFloat(item.lat),
-        lng: parseFloat(item.lon)
-      }))
-      
-      setSearchResults(results)
+      setSearchResults(results.slice(0, 8))
     } catch (error) {
       console.error('Search error:', error)
       setSearchResults([])
@@ -281,6 +312,16 @@ export default function MapViewLeaflet({ user }) {
         .addTo(map.current)
         .bindPopup(`📍 ${name}`)
         .openPopup()
+      
+      // Load beach conditions for selected location
+      const beachPin = {
+        gps_lat: lat,
+        gps_lng: lng,
+        report_count: 0,
+        danger_level: 'low'
+      }
+      setSelectedPin(beachPin)
+      loadBeachConditions(lat, lng)
     }
     setSearchQuery('')
     setSearchResults([])
@@ -424,7 +465,7 @@ export default function MapViewLeaflet({ user }) {
             {selectedPin.gps_lat.toFixed(6)}, {selectedPin.gps_lng.toFixed(6)}
           </p>
 
-          {weather && (
+          {beachConditions && (
             <div style={{
               background: 'rgba(59, 130, 246, 0.2)',
               border: '1px solid rgba(59, 130, 246, 0.3)',
@@ -433,27 +474,51 @@ export default function MapViewLeaflet({ user }) {
               marginBottom: '1rem'
             }}>
               <h4 style={{ color: 'rgb(147, 197, 253)', fontWeight: '500', marginBottom: '0.75rem' }}>
-                🌊 Marine Weather
+                🏖️ Beach Conditions
               </h4>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.875rem' }}>
-                <div style={{ color: 'rgb(147, 197, 253)' }}>
-                  <strong>Wave Height:</strong> {weather.waveHeight?.toFixed(2) || 'N/A'}m
-                </div>
-                <div style={{ color: 'rgb(147, 197, 253)' }}>
-                  <strong>Wind Speed:</strong> {weather.windSpeed?.toFixed(1) || 'N/A'} km/h
-                </div>
-              </div>
+              
+              {/* Safety Status */}
               <div style={{
-                marginTop: '0.75rem',
-                padding: '0.5rem',
-                borderRadius: '6px',
+                padding: '0.75rem',
+                borderRadius: '8px',
                 textAlign: 'center',
                 fontWeight: '600',
-                background: weather.isSafe ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
-                color: weather.isSafe ? 'rgb(134, 239, 172)' : 'rgb(252, 165, 165)',
-                border: weather.isSafe ? '1px solid rgba(34, 197, 94, 0.5)' : '1px solid rgba(239, 68, 68, 0.5)'
+                marginBottom: '1rem',
+                background: `${beachConditions.safetyColor}33`,
+                color: beachConditions.safetyColor,
+                border: `1px solid ${beachConditions.safetyColor}66`
               }}>
-                {weather.isSafe ? '✅ Safe Conditions' : '⚠️ Unsafe Conditions'}
+                {beachConditions.safetyLevel === 'safe' ? '✅' : beachConditions.safetyLevel === 'caution' ? '⚠️' : '🚨'} {beachConditions.safetyText}
+              </div>
+
+              {/* Weather Data */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.875rem', marginBottom: '1rem' }}>
+                <div style={{ color: 'rgb(147, 197, 253)' }}>
+                  <strong>Wave Height:</strong> {beachConditions.waveHeight?.toFixed(1) || 'N/A'}m
+                </div>
+                <div style={{ color: 'rgb(147, 197, 253)' }}>
+                  <strong>Wind Speed:</strong> {beachConditions.windSpeed?.toFixed(0) || 'N/A'} km/h
+                </div>
+                {beachConditions.windGusts > beachConditions.windSpeed + 5 && (
+                  <div style={{ color: 'rgb(252, 165, 165)' }}>
+                    <strong>Wind Gusts:</strong> {beachConditions.windGusts?.toFixed(0)} km/h
+                  </div>
+                )}
+                {beachConditions.maxWaveHeight > beachConditions.waveHeight + 0.3 && (
+                  <div style={{ color: 'rgb(252, 165, 165)' }}>
+                    <strong>Max Waves:</strong> {beachConditions.maxWaveHeight?.toFixed(1)}m
+                  </div>
+                )}
+              </div>
+
+              {/* Detailed Conditions */}
+              <div style={{ fontSize: '0.8rem', color: 'rgb(147, 197, 253)' }}>
+                <strong>Current Conditions:</strong>
+                <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+                  {beachConditions.conditions?.map((condition, index) => (
+                    <li key={index} style={{ marginBottom: '0.25rem' }}>{condition}</li>
+                  ))}
+                </ul>
               </div>
             </div>
           )}
