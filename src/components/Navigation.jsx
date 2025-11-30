@@ -1,9 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 export default function Navigation({ user, currentPage }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 1024)
+    }
+    
+    checkScreenSize()
+    window.addEventListener('resize', checkScreenSize)
+    return () => window.removeEventListener('resize', checkScreenSize)
+  }, [])
 
   const handleLogout = () => {
     localStorage.removeItem('karavali_user')
@@ -16,6 +27,7 @@ export default function Navigation({ user, currentPage }) {
       case 'user': return '🌊 Karavali Connect'
       case 'merchant': return '🏪 Merchant Portal'
       case 'authority': return '🏛️ Authority Portal'
+      case 'admin': return '👑 Admin Panel'
       default: return '🌊 Karavali Connect'
     }
   }
@@ -25,105 +37,115 @@ export default function Navigation({ user, currentPage }) {
       case 'user': return `Coins: ${user?.coin_balance || 0} • Report & Earn`
       case 'merchant': return `Merchant Coins: ${user?.merchant_coins || 0} • Scan QR codes to redeem`
       case 'authority': return 'Manage reports & payments'
+      case 'admin': return 'System administration'
       default: return 'Coastal civic engagement'
     }
   }
 
+  const navigationItems = [
+    { id: 'profile', label: '👤 Profile', action: () => navigate('/profile') },
+    { id: 'logout', label: '🚪 Logout', action: handleLogout }
+  ]
+
+  const closeMobileMenu = () => setIsMobileMenuOpen(false)
+
   return (
     <>
       {/* Desktop Navigation */}
-      <nav style={{
-        background: 'var(--dark-gradient)',
-        padding: 'clamp(0.5rem, 2vw, 0.75rem) clamp(1rem, 4vw, 2rem)',
-        borderBottom: '1px solid var(--glass-border)',
-        display: window.innerWidth >= 1024 ? 'flex' : 'none',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        minHeight: '60px'
-      }}>
-        <h1 style={{ fontSize: '1.25rem', margin: 0, color: 'white' }}>
-          🌊 Karavali Connect
-        </h1>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{
-            background: 'var(--glass-bg)',
-            padding: '0.25rem 0.75rem',
-            borderRadius: '20px',
-            fontSize: '0.875rem',
-            border: '1px solid var(--glass-border)',
-            color: 'white'
-          }}>
-            {getPageInfo()}
-          </div>
-          <button onClick={handleLogout} className="btn btn-secondary">
-            🚪 Logout
-          </button>
-        </div>
-      </nav>
-
-      {/* Mobile Navigation */}
-      <nav style={{
-        background: 'var(--dark-gradient)',
-        padding: 'clamp(0.5rem, 3vw, 0.75rem) clamp(0.75rem, 4vw, 1rem)',
-        borderBottom: '1px solid var(--glass-border)',
-        display: window.innerWidth < 1024 ? 'flex' : 'none',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        position: 'relative',
-        minHeight: '56px',
-        width: '100%',
-        boxSizing: 'border-box'
-      }}>
-        <h1 style={{ fontSize: '1.125rem', fontWeight: 'bold', margin: 0, color: 'white' }}>
-          🌊 Karavali Connect
-        </h1>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{ 
-            background: 'var(--glass-bg)', 
-            padding: '0.25rem 0.5rem', 
-            borderRadius: '12px',
-            fontSize: '0.75rem',
-            border: '1px solid var(--glass-border)',
-            color: 'white'
-          }}>
-            {currentPage === 'user' ? `${user?.coin_balance || 0} 🪙` : getPageInfo()}
-          </div>
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            style={{
-              color: 'white',
-              padding: '0.5rem',
-              borderRadius: '8px',
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '1.25rem'
-            }}
-          >
-            {isMobileMenuOpen ? '✕' : '☰'}
-          </button>
-        </div>
+      {!isMobile && (
+        <nav className="desktop-nav">
+          <h1 className="nav-title">
+            {getPageTitle()}
+          </h1>
           
-        {/* Mobile Menu Dropdown */}
-        {isMobileMenuOpen && (
-          <div style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            background: 'var(--dark-gradient)',
-            borderBottom: '1px solid var(--glass-border)',
-            padding: '1rem',
-            zIndex: 1000
-          }}>
-            <button onClick={handleLogout} className="btn btn-secondary" style={{ width: '100%' }}>
+          <div className="nav-actions">
+            <div className="nav-info">
+              {getPageInfo()}
+            </div>
+            <button onClick={handleLogout} className="btn btn-secondary">
               🚪 Logout
             </button>
           </div>
-        )}
-      </nav>
+        </nav>
+      )}
+
+      {/* Mobile Navigation */}
+      {isMobile && (
+        <>
+          <nav className="mobile-nav">
+            <h1 className="mobile-nav-title">
+              {getPageTitle()}
+            </h1>
+            
+            <div className="mobile-nav-actions">
+              <div className="mobile-nav-info">
+                {currentPage === 'user' ? `${user?.coin_balance || 0} 🪙` : 
+                 currentPage === 'merchant' ? `${user?.merchant_coins || 0} 🪙` :
+                 getPageTitle().split(' ')[0]}
+              </div>
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="mobile-menu-toggle"
+                aria-label="Toggle menu"
+              >
+                {isMobileMenuOpen ? '✕' : '☰'}
+              </button>
+            </div>
+          </nav>
+
+          {/* Mobile Sidebar Overlay */}
+          {isMobileMenuOpen && (
+            <div className="mobile-sidebar-overlay" onClick={closeMobileMenu}>
+              <div className="mobile-sidebar" onClick={(e) => e.stopPropagation()}>
+                <div className="mobile-sidebar-header">
+                  <h2>🌊 Karavali Connect</h2>
+                  <button 
+                    onClick={closeMobileMenu}
+                    className="mobile-sidebar-close"
+                    aria-label="Close menu"
+                  >
+                    ✕
+                  </button>
+                </div>
+                
+                <div className="mobile-sidebar-content">
+                  <div className="mobile-user-info">
+                    <div className="mobile-user-avatar">
+                      {currentPage === 'user' ? '👤' : 
+                       currentPage === 'merchant' ? '🏪' :
+                       currentPage === 'authority' ? '🏛️' : '👑'}
+                    </div>
+                    <div className="mobile-user-details">
+                      <div className="mobile-user-phone">{user?.phone_number}</div>
+                      <div className="mobile-user-role">{user?.role?.replace('_', ' ')}</div>
+                      <div className="mobile-user-coins">
+                        {currentPage === 'user' && `${user?.coin_balance || 0} Coins`}
+                        {currentPage === 'merchant' && `${user?.merchant_coins || 0} Merchant Coins`}
+                        {(currentPage === 'authority' || currentPage === 'admin') && 'Authority Access'}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mobile-sidebar-menu">
+                    {navigationItems.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          item.action()
+                          closeMobileMenu()
+                        }}
+                        className="mobile-sidebar-item"
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </>
   )
 }
