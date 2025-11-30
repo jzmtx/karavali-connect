@@ -10,7 +10,7 @@ import AdminPanel from './pages/AdminPanel'
 import Profile from './pages/Profile'
 import Loading from './components/Loading'
 import ResponsiveLayout from './components/ResponsiveLayout'
-import LocationHelper from './components/LocationHelper'
+// import LocationHelper from './components/LocationHelper'
 
 function App() {
   const [user, setUser] = useState(null)
@@ -65,7 +65,7 @@ function App() {
   return (
     <ResponsiveLayout>
       {/* Temporary test helper - remove in production */}
-      {process.env.NODE_ENV === 'development' && <LocationHelper />}
+      {/* {process.env.NODE_ENV === 'development' && <LocationHelper />} */}
       <Routes>
       <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
       <Route path="/register" element={!user ? <Register /> : <Navigate to="/" />} />
