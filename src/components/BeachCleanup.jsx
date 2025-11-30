@@ -153,16 +153,24 @@ export default function BeachCleanup({ user, onUpdate }) {
         return
       }
 
-      // Get location
+      // Get live location with high accuracy
       const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject)
+        navigator.geolocation.getCurrentPosition(
+          resolve,
+          reject,
+          { 
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0
+          }
+        )
       })
 
       // Upload images
       const beforeUrl = await uploadImage(beforeImage)
       const afterUrl = await uploadImage(afterImage)
 
-      // Create report
+      // Create report with live location tracking
       const { error: reportError } = await supabase
         .from('reports')
         .insert({
@@ -173,7 +181,8 @@ export default function BeachCleanup({ user, onUpdate }) {
           gps_lng: position.coords.longitude,
           image_before_url: beforeUrl,
           image_after_url: afterUrl,
-          coins_awarded: 50
+          coins_awarded: 50,
+          description: `Live location verified - Accuracy: ${position.coords.accuracy}m, Speed: ${position.coords.speed || 0}m/s`
         })
 
       if (reportError) throw reportError

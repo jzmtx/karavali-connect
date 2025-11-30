@@ -63,9 +63,17 @@ export default function DisposeEarn({ user, onUpdate }) {
     setError('')
 
     try {
-      // Get location
+      // Get live location with high accuracy
       const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject)
+        navigator.geolocation.getCurrentPosition(
+          resolve,
+          reject,
+          { 
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0
+          }
+        )
       })
 
       const userLat = position.coords.latitude
@@ -83,7 +91,7 @@ export default function DisposeEarn({ user, onUpdate }) {
       const handUrl = await uploadImage(handPhoto)
       const binUrl = await uploadImage(binPhoto)
 
-      // Create report
+      // Create report with live location tracking
       await supabase
         .from('reports')
         .insert({
@@ -95,7 +103,8 @@ export default function DisposeEarn({ user, onUpdate }) {
           gps_lng: userLng,
           image_before_url: handUrl,
           image_after_url: binUrl,
-          coins_awarded: 5
+          coins_awarded: 5,
+          description: `Live location verified - Accuracy: ${position.coords.accuracy}m, Distance to bin: ${distance.toFixed(1)}m`
         })
 
       // Award coins

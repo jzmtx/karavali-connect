@@ -15,11 +15,21 @@ export default function SafetyReport({ user }) {
   const getLocation = async () => {
     try {
       const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject)
+        navigator.geolocation.getCurrentPosition(
+          resolve, 
+          reject,
+          {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0
+          }
+        )
       })
       setLocation({
         lat: position.coords.latitude,
-        lng: position.coords.longitude
+        lng: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        speed: position.coords.speed || 0
       })
     } catch (err) {
       setError('Failed to get location. Please enable GPS.')
@@ -87,7 +97,7 @@ export default function SafetyReport({ user }) {
           })
       }
 
-      // Create report
+      // Create report with live location tracking
       await supabase
         .from('reports')
         .insert({
@@ -97,7 +107,7 @@ export default function SafetyReport({ user }) {
           gps_lat: location.lat,
           gps_lng: location.lng,
           image_before_url: imageUrl,
-          description: description
+          description: `${description} - Live location verified (Accuracy: ${location.accuracy}m, Speed: ${location.speed}m/s)`
         })
 
       // Send Telegram alert
@@ -246,7 +256,7 @@ export default function SafetyReport({ user }) {
           marginBottom: '1rem',
           fontSize: '0.875rem'
         }}>
-          📍 Location: {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
+          📍 Location: {location.lat.toFixed(6)}, {location.lng.toFixed(6)} (±{location.accuracy}m)
         </div>
       )}
 

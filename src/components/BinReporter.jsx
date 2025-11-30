@@ -112,7 +112,15 @@ export default function BinReporter({ user, onUpdate }) {
 
     try {
       const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000, enableHighAccuracy: true })
+        navigator.geolocation.getCurrentPosition(
+          resolve, 
+          reject, 
+          { 
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0
+          }
+        )
       })
 
       const userLat = position.coords.latitude
@@ -143,7 +151,7 @@ export default function BinReporter({ user, onUpdate }) {
         })
       }
 
-      // Create report
+      // Create report with live location tracking
       const { error: reportError } = await supabase
         .from('reports')
         .insert({
@@ -154,7 +162,7 @@ export default function BinReporter({ user, onUpdate }) {
           gps_lat: userLat,
           gps_lng: userLng,
           image_before_url: imageUrl,
-          description: `Bin status: ${newStatus}`,
+          description: `Bin status: ${newStatus} - Live location verified (Accuracy: ${position.coords.accuracy}m)`,
           coins_awarded: newStatus === 'full' ? 5 : 10
         })
 
