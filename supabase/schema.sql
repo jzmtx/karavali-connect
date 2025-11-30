@@ -8,7 +8,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   phone_number TEXT UNIQUE NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('tourist', 'merchant', 'admin')),
+  role TEXT NOT NULL CHECK (role IN ('tourist', 'merchant', 'admin', 'beach_authority', 'municipality', 'fisheries_department')),
   coin_balance INTEGER DEFAULT 0,
   pending_coins INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

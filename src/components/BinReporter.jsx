@@ -65,49 +65,14 @@ export default function BinReporter({ user, onUpdate }) {
 
       // Verify GPS location (must be within 10 meters)
       const distance = getDistance(userLat, userLng, data.gps_lat, data.gps_lng)
-      if (distance > config.gpsAccuracy) {
-        setError(`You must be within ${config.gpsAccuracy}m of the bin. Current distance: ${distance.toFixed(1)}m`)
+      if (distance > 10) {
+        setError(`You must be within 10m of the bin. Current distance: ${distance.toFixed(1)}m`)
         return
-      }
-
-      // Check if user already scanned this bin today (UTC)
-      const todayUTC = new Date()
-      todayUTC.setUTCHours(0, 0, 0, 0)
-      
-      const { data: existingScans } = await supabase
-        .from('bin_qr_scans')
-        .select('*')
-        .eq('bin_id', data.bin_id)
-        .eq('user_id', user.id)
-        .gte('scanned_at', todayUTC.toISOString())
-
-      if (existingScans && existingScans.length > 0) {
-        setMessage('✅ You already scanned this bin today! Coins already awarded.')
-        setBinData(data)
-        return
-      }
-
-      // Use atomic transaction function
-      const { data: scanResult, error: scanError } = await supabase
-        .rpc('process_qr_scan', {
-          bin_id_param: data.bin_id,
-          user_id_param: user.id,
-          scan_lat: userLat,
-          scan_lng: userLng,
-          coins_param: 10
-        })
-
-      if (scanError) {
-        throw new Error(`QR scan processing failed: ${scanError.message}`)
-      }
-
-      if (!scanResult.success) {
-        throw new Error(scanResult.error)
       }
 
       setBinData(data)
-      setMessage('✅ Bin verified! You earned 10 coins instantly!')
-      onUpdate()
+      setMessage(`✅ Bin ${data.bin_id} verified! Current status: ${data.status.toUpperCase()}`)
+      
     } catch (err) {
       console.error('QR scan error:', err)
       setError(err.message || 'Failed to verify bin QR code')
@@ -136,8 +101,7 @@ export default function BinReporter({ user, onUpdate }) {
     }
   }
 
-  // Note: Photo submission is now optional since QR scan verifies automatically
-  const handleSubmit = async () => {
+  const handleBinStatusReport = async (newStatus) => {
     if (!binData) {
       setError('Please scan QR code first')
       return
@@ -147,33 +111,8 @@ export default function BinReporter({ user, onUpdate }) {
     setError('')
 
     try {
-      // Get user's current location with proper error handling
       const position = await new Promise((resolve, reject) => {
-        if (!navigator.geolocation) {
-          reject(new Error('Geolocation is not supported by this browser'))
-          return
-        }
-        
-        navigator.geolocation.getCurrentPosition(
-          resolve,
-          (error) => {
-            switch(error.code) {
-              case error.PERMISSION_DENIED:
-                reject(new Error('Location access denied. Please enable location permissions.'))
-                break
-              case error.POSITION_UNAVAILABLE:
-                reject(new Error('Location information unavailable. Please try again.'))
-                break
-              case error.TIMEOUT:
-                reject(new Error('Location request timed out. Please try again.'))
-                break
-              default:
-                reject(new Error('An unknown error occurred while retrieving location.'))
-                break
-            }
-          },
-          { timeout: 10000, enableHighAccuracy: true }
-        )
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000, enableHighAccuracy: true })
       })
 
       const userLat = position.coords.latitude
@@ -181,35 +120,54 @@ export default function BinReporter({ user, onUpdate }) {
 
       let imageUrl = null
       if (photo) {
-        // Upload photo if provided
         imageUrl = await uploadImage(photo)
       }
 
-      // Create report (optional - for photo evidence)
-      if (imageUrl) {
+      // Update bin status if reporting full for first time
+      if (newStatus === 'full' && binData.status !== 'full') {
         await supabase
-          .from('reports')
-          .insert({
-            user_id: user.id,
-            bin_id: binData.bin_id,
-            type: 'bin',
-            status: 'verified', // Already verified by QR scan
-            gps_lat: userLat,
-            gps_lng: userLng,
-            image_before_url: imageUrl,
-            coins_awarded: 10
+          .from('bins')
+          .update({ 
+            status: 'full',
+            last_reported_time: new Date().toISOString(),
+            last_reported_by: user.id
           })
+          .eq('bin_id', binData.bin_id)
 
-        // Send Telegram alert
-        await sendTelegramAlert('bin', {
+        // Notify municipality
+        await sendTelegramAlert('bin_full', {
+          binId: binData.bin_id,
           lat: userLat,
           lng: userLng,
-          imageUrl: imageUrl,
-          description: `Bin verified via QR scan at ${binData.bin_id}`
+          description: `Bin ${binData.bin_id} reported as FULL - needs emptying`
         })
       }
 
-      setMessage('✅ Bin verified and coins awarded! Photo submitted for record.')
+      // Create report
+      const { error: reportError } = await supabase
+        .from('reports')
+        .insert({
+          user_id: user.id,
+          bin_id: binData.bin_id,
+          type: 'bin',
+          status: 'pending',
+          gps_lat: userLat,
+          gps_lng: userLng,
+          image_before_url: imageUrl,
+          description: `Bin status: ${newStatus}`,
+          coins_awarded: newStatus === 'full' ? 5 : 10
+        })
+
+      if (reportError) throw reportError
+
+      // Award coins
+      const coinsAwarded = newStatus === 'full' ? 5 : 10
+      await supabase.rpc('increment_coins', {
+        user_id_param: user.id,
+        coins_param: coinsAwarded
+      })
+
+      setMessage(`✅ ${newStatus === 'full' ? 'Bin reported as full!' : 'Cleanup verified!'} You earned ${coinsAwarded} coins!`)
       setBinData(null)
       setPhoto(null)
       setQrCode('')
@@ -314,23 +272,42 @@ export default function BinReporter({ user, onUpdate }) {
       )}
 
       {binData && (
-        <button
-          onClick={handleSubmit}
-          disabled={loading || !binData}
-          style={{
-            width: '100%',
-            padding: '0.75rem',
-            background: loading || !binData ? '#9ca3af' : '#10b981',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '1rem',
-            fontWeight: '600',
-            cursor: loading || !binData ? 'not-allowed' : 'pointer'
-          }}
-        >
-          {loading ? 'Submitting...' : 'Submit Photo (Optional)'}
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <button
+            onClick={() => handleBinStatusReport('full')}
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              background: loading ? '#9ca3af' : '#ef4444',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '1rem',
+              fontWeight: '600',
+              cursor: loading ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {loading ? 'Reporting...' : '🗑️ Report Bin as FULL (+5 coins)'}
+          </button>
+          <button
+            onClick={() => handleBinStatusReport('cleaned')}
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              background: loading ? '#9ca3af' : '#10b981',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '1rem',
+              fontWeight: '600',
+              cursor: loading ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {loading ? 'Verifying...' : '✅ Verify Cleanup/Disposal (+10 coins)'}
+          </button>
+        </div>
       )}
 
       <div style={{
@@ -344,10 +321,11 @@ export default function BinReporter({ user, onUpdate }) {
         <strong>💡 How it works:</strong>
         <ul style={{ marginTop: '0.5rem', paddingLeft: '1.5rem' }}>
           <li>Scan QR code on the bin (must be within 10m)</li>
-          <li>System verifies bin and location automatically</li>
-          <li>Earn 10 coins instantly (verified by QR scan)</li>
-          <li>Optional: Add photo for record keeping</li>
-          <li>One scan per bin per day maximum</li>
+          <li>Report bin as FULL (+5 coins) - notifies municipality</li>
+          <li>OR verify cleanup/disposal (+10 coins)</li>
+          <li>Optional: Add photo evidence</li>
+          <li>Municipality gets notified when bins are full</li>
+          <li>Municipality manually updates status after clearing</li>
         </ul>
       </div>
     </div>

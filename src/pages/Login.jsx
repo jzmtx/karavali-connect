@@ -5,6 +5,7 @@ import { useNavigate, Link } from 'react-router-dom'
 export default function Login() {
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
+  const [selectedRole, setSelectedRole] = useState('tourist')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
@@ -70,12 +71,25 @@ export default function Login() {
       // Dispatch event to notify other components
       window.dispatchEvent(new Event('karavali_user_changed'))
 
+      // Check if role matches selection
+      if (selectedRole === 'authority' && !['municipality', 'beach_authority', 'fisheries_department', 'admin'].includes(userData.role)) {
+        setError('Invalid credentials for authority login')
+        setLoading(false)
+        return
+      }
+      
+      if (selectedRole === 'tourist' && ['municipality', 'beach_authority', 'fisheries_department', 'admin'].includes(userData.role)) {
+        setError('Invalid credentials for tourist login')
+        setLoading(false)
+        return
+      }
+
       // Navigate based on role with replace to prevent back navigation
       if (userData.role === 'merchant') {
         navigate('/merchant', { replace: true })
       } else if (userData.role === 'admin') {
-        navigate('/admin', { replace: true })
-      } else if (['municipality', 'beach_authority', 'forest_department'].includes(userData.role)) {
+        navigate('/authority', { replace: true })
+      } else if (['municipality', 'beach_authority', 'fisheries_department'].includes(userData.role)) {
         navigate('/authority', { replace: true })
       } else {
         navigate('/user', { replace: true })
@@ -96,6 +110,31 @@ export default function Login() {
             🌊 Karavali Connect
           </h1>
           <p style={{ color: 'rgba(255,255,255,0.8)' }}>Clean. Earn. Stay Safe.</p>
+        </div>
+
+        {/* Role Selection */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'white', fontWeight: '500' }}>
+            Login As:
+          </label>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              type="button"
+              onClick={() => setSelectedRole('tourist')}
+              className={`btn ${selectedRole === 'tourist' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ flex: 1, fontSize: '0.875rem' }}
+            >
+              🏖️ Tourist
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedRole('authority')}
+              className={`btn ${selectedRole === 'authority' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ flex: 1, fontSize: '0.875rem' }}
+            >
+              🏛️ Authority
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -172,11 +211,12 @@ export default function Login() {
                 e.preventDefault()
                 setPhone('9999999999')
                 setPassword('demo123')
+                setSelectedRole('tourist')
               }}
               className="btn btn-secondary"
               style={{ width: '100%', fontSize: '0.875rem' }}
             >
-              👤 Fill User Demo
+              👤 Tourist Demo
             </button>
             <button
               type="button"
@@ -184,11 +224,12 @@ export default function Login() {
                 e.preventDefault()
                 setPhone('8888888888')
                 setPassword('demo123')
+                setSelectedRole('tourist')
               }}
               className="btn btn-secondary"
               style={{ width: '100%', fontSize: '0.875rem' }}
             >
-              🏪 Fill Merchant Demo
+              🏪 Merchant Demo
             </button>
             <button
               type="button"
@@ -196,11 +237,12 @@ export default function Login() {
                 e.preventDefault()
                 setPhone('7777777777')
                 setPassword('admin123')
+                setSelectedRole('authority')
               }}
               className="btn btn-secondary"
               style={{ width: '100%', fontSize: '0.875rem' }}
             >
-              👑 Fill Admin Demo
+              👑 Authority Demo
             </button>
           </div>
         </div>
