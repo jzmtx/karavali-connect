@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import QRScanner from '../components/QRScanner'
 import Navigation from '../components/Navigation'
 import MerchantBeachRegistration from '../components/MerchantBeachRegistration'
@@ -8,7 +8,8 @@ import LocationUpdatePrompt from '../components/LocationUpdatePrompt'
 import { locationService } from '../services/locationService'
 
 export default function MerchantPortal({ user }) {
-  const [activeTab, setActiveTab] = useState('register')
+  const [searchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'register')
   const [isRegistered, setIsRegistered] = useState(false)
   const [scannedData, setScannedData] = useState(null)
   const [userData, setUserData] = useState(null)
@@ -31,7 +32,13 @@ export default function MerchantPortal({ user }) {
     loadPaymentRequests()
     checkRegistrationStatus()
     initializeLocationService()
-  }, [user])
+    
+    // Update tab when URL changes
+    const tab = searchParams.get('tab')
+    if (tab && tab !== activeTab) {
+      setActiveTab(tab)
+    }
+  }, [user, searchParams])
 
   useEffect(() => {
     // Merchants have permanent location access
@@ -225,7 +232,8 @@ export default function MerchantPortal({ user }) {
       setScannedData(null)
       setUserData(null)
       setBillAmount('')
-      loadMerchantData()
+      // Reload merchant data to update coin balance
+      await loadMerchantData()
     } catch (err) {
       setError(err.message || 'Failed to process redemption')
     } finally {
@@ -289,10 +297,7 @@ export default function MerchantPortal({ user }) {
 
   const handleLocationPromptCancel = () => {
     setShowLocationPrompt(false)
-    // Force switch to payments tab (wallet equivalent for merchants)
-    if (!['payments', 'profile'].includes(activeTab)) {
-      setActiveTab('payments')
-    }
+    // User can manually choose which tab to go to
   }
 
   const requiresLocation = (tabId) => {
@@ -315,14 +320,7 @@ export default function MerchantPortal({ user }) {
     <div style={{ minHeight: '100vh' }}>
       <Navigation user={user} currentPage="merchant" />
 
-      {/* Location Status Bar - Merchants have permanent access */}
-      <div className="container" style={{ marginTop: '1rem' }}>
-        <div className="bg-green-500/20 border border-green-500/30 rounded-lg p-3 text-center">
-          <p className="text-green-300 text-sm">
-            📍 Merchant Access - No location expiry
-          </p>
-        </div>
-      </div>
+
 
       {/* Tabs */}
       <div className="tab-nav container">

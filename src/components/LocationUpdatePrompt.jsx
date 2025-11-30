@@ -22,10 +22,15 @@ const LocationUpdatePrompt = ({ user, onLocationUpdated, onCancel }) => {
     setError('');
 
     try {
+      console.log('Updating location for user:', user.id);
       const result = await locationService.updateUserLocation(user.id);
+      console.log('Location update result:', result);
       
       if (result.success) {
-        onLocationUpdated(result);
+        // Wait a moment for database to process
+        setTimeout(() => {
+          onLocationUpdated(result);
+        }, 500);
       } else {
         setError('Failed to update location');
       }

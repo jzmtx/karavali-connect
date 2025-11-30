@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from './lib/supabase'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import HomePage from './pages/HomePage'
 import UserPortal from './pages/UserPortal'
 import MerchantPortal from './pages/MerchantPortal'
 import AuthorityPortal from './pages/AuthorityPortal'
@@ -71,6 +72,10 @@ function App() {
       <Route path="/register" element={!user ? <Register /> : <Navigate to="/" />} />
       <Route
         path="/"
+        element={<HomePage user={user} />}
+      />
+      <Route
+        path="/dashboard"
         element={
           user ? (
             <Navigate to={

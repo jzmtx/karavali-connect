@@ -70,11 +70,16 @@ class LocationService {
       this.currentLocation = location;
       this.locationExpiry = new Date(Date.now() + 12 * 60 * 60 * 1000); // 12 hours from now
 
+      // Verify the update by checking database
+      const verification = await this.checkLocationValidity(userId);
+      
       return {
         success: true,
         location,
         expiresAt: this.locationExpiry,
-        message: 'Location updated successfully'
+        message: 'Location updated successfully',
+        verified: verification.valid,
+        timeRemaining: this.formatTimeRemaining()
       };
     } catch (error) {
       console.error('Error updating location:', error);
@@ -168,6 +173,25 @@ class LocationService {
         success: false,
         needsUpdate: true,
         message: 'Error checking location status'
+      };
+    }
+  }
+
+  // Force refresh location status from database
+  async forceRefreshLocation(userId, userRole = 'tourist') {
+    try {
+      // Clear local cache first
+      this.currentLocation = null;
+      this.locationExpiry = null;
+      
+      // Re-initialize from database
+      return await this.initializeForUser(userId, userRole);
+    } catch (error) {
+      console.error('Error force refreshing location:', error);
+      return {
+        success: false,
+        needsUpdate: true,
+        message: 'Error refreshing location status'
       };
     }
   }

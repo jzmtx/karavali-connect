@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import Navigation from '../components/Navigation'
 import LocationSearch from '../components/LocationSearch'
 import BeachSelector from '../components/BeachSelector'
 
 export default function AuthorityPortal({ user }) {
-  const [activeTab, setActiveTab] = useState('reports')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'reports')
   const [reports, setReports] = useState([])
   const [paymentRequests, setPaymentRequests] = useState([])
   const [users, setUsers] = useState([])
@@ -21,6 +22,11 @@ export default function AuthorityPortal({ user }) {
   const [newBin, setNewBin] = useState({ bin_id: '', gps_lat: '', gps_lng: '', location_name: '' })
   const [selectedBeach, setSelectedBeach] = useState(null)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const tab = searchParams.get('tab') || 'reports'
+    setActiveTab(tab)
+  }, [searchParams])
 
   useEffect(() => {
     if (user?.role === 'admin') {
@@ -447,25 +453,42 @@ export default function AuthorityPortal({ user }) {
   
   const tabs = getTabsForRole()
 
-  return (
-    <div style={{ minHeight: '100vh' }}>
-      <Navigation user={user} currentPage="authority" />
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId)
+    setSearchParams({ tab: tabId })
+  }
 
-      {/* Tab Navigation */}
-      <div className="tab-nav container">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+  const getRoleTitle = () => {
+    switch (user?.role) {
+      case 'admin':
+        return 'Welcome to Admin Dashboard'
+      case 'beach_authority':
+        return 'Welcome to Beach Authority Dashboard'
+      case 'municipality':
+        return 'Welcome to Municipality Dashboard'
+      case 'fisheries_department':
+        return 'Welcome to Fisheries Department Dashboard'
+      default:
+        return 'Welcome to Authority Dashboard'
+    }
+  }
+
+  return (
+    <div className="app-layout">
+      <Navigation 
+        user={user} 
+        currentPage="authority" 
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+      />
 
       {/* Content */}
-      <main className="container main-content">
+      <main className="main-content">
+        <div className="container">
+          <div className="page-header">
+            <h1>{getRoleTitle()}</h1>
+          </div>
         {error && (
           <div className="alert alert-error">
             {error}
@@ -1101,6 +1124,7 @@ export default function AuthorityPortal({ user }) {
               </div>
             </div>
           )}
+          </div>
         </div>
       </main>
     </div>

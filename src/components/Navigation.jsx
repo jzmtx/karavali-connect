@@ -1,20 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-export default function Navigation({ user, currentPage }) {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
+export default function Navigation({ user, currentPage, tabs, activeTab, onTabChange }) {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const navigate = useNavigate()
-
-  useEffect(() => {
-    const checkScreenSize = () => {
-      setIsMobile(window.innerWidth < 1024)
-    }
-    
-    checkScreenSize()
-    window.addEventListener('resize', checkScreenSize)
-    return () => window.removeEventListener('resize', checkScreenSize)
-  }, [])
 
   const handleLogout = () => {
     localStorage.removeItem('karavali_user')
@@ -22,129 +11,156 @@ export default function Navigation({ user, currentPage }) {
     navigate('/login', { replace: true })
   }
 
-  const getPageTitle = () => {
-    switch (currentPage) {
-      case 'user': return '🌊 Karavali Connect'
-      case 'merchant': return '🏪 Merchant Portal'
-      case 'authority': return '🏛️ Authority Portal'
-      case 'admin': return '👑 Admin Panel'
-      default: return '🌊 Karavali Connect'
+  const getNavigationItems = () => {
+    const commonItems = [
+      { id: 'home', label: 'Home', icon: '🏠', action: () => navigate('/') }
+    ];
+    
+    if (currentPage === 'user') {
+      return [
+        ...commonItems,
+        { id: 'dashboard', label: 'Dashboard', icon: '📊', action: () => navigate('/dashboard') },
+        { id: 'map', label: 'Interactive Map', icon: '🗺️', action: () => navigate('/user') },
+        { id: 'activities', label: 'Activities', icon: '🏃', divider: true },
+        { id: 'bin', label: 'Report Bin', icon: '🗑️', action: () => navigate('/user?tab=bin') },
+        { id: 'cleanup', label: 'Beach Cleanup', icon: '🧹', action: () => navigate('/user?tab=cleanup') },
+        { id: 'dispose', label: 'Dispose & Earn', icon: '♻️', action: () => navigate('/user?tab=dispose') },
+        { id: 'safety', label: 'Safety Report', icon: '⚠️', action: () => navigate('/user?tab=safety') },
+        { id: 'services', label: 'Services', icon: '🛍️', divider: true },
+        { id: 'merchants', label: 'Local Merchants', icon: '🏪', action: () => navigate('/user?tab=merchants') },
+        { id: 'wallet', label: 'My Wallet', icon: '💰', action: () => navigate('/user?tab=wallet') },
+        { id: 'account', label: 'Account', icon: '⚙️', divider: true },
+        { id: 'profile', label: 'Profile Settings', icon: '👤', action: () => navigate('/user?tab=profile') },
+        { id: 'logout', label: 'Logout', icon: '🚪', action: handleLogout }
+      ]
+    } else if (currentPage === 'merchant') {
+      return [
+        ...commonItems,
+        { id: 'dashboard', label: 'Dashboard', icon: '📊', action: () => navigate('/dashboard') },
+        { id: 'business', label: 'Business', icon: '🏢', divider: true },
+        { id: 'register', label: 'Beach Registration', icon: '🏖️', action: () => navigate('/merchant?tab=register') },
+        { id: 'scan', label: 'Scan Customer QR', icon: '📷', action: () => navigate('/merchant?tab=scan') },
+        { id: 'payments', label: 'Payment Requests', icon: '💳', action: () => navigate('/merchant?tab=payments') },
+        { id: 'account', label: 'Account', icon: '⚙️', divider: true },
+        { id: 'profile', label: 'Profile Settings', icon: '👤', action: () => navigate('/merchant?tab=profile') },
+        { id: 'logout', label: 'Logout', icon: '🚪', action: handleLogout }
+      ]
+    } else if (currentPage === 'authority') {
+      const authorityItems = [
+        { id: 'management', label: 'Management', icon: '🏛️', divider: true }
+      ]
+      
+      // Add dynamic tabs from AuthorityPortal
+      if (tabs) {
+        tabs.forEach(tab => {
+          authorityItems.push({
+            id: tab.id,
+            label: tab.label,
+            icon: tab.icon,
+            action: () => onTabChange(tab.id),
+            isActive: activeTab === tab.id
+          })
+        })
+      }
+      
+      authorityItems.push(
+        { id: 'account', label: 'Account', icon: '⚙️', divider: true },
+        { id: 'logout', label: 'Logout', icon: '🚪', action: handleLogout }
+      )
+      
+      return authorityItems
     }
+    
+    return [
+      ...commonItems,
+      { id: 'profile', label: 'Profile Settings', icon: '👤', action: () => navigate('/profile') },
+      { id: 'logout', label: 'Logout', icon: '🚪', action: handleLogout }
+    ]
   }
-
-  const getPageInfo = () => {
-    switch (currentPage) {
-      case 'user': return `Coins: ${user?.coin_balance || 0} • Report & Earn`
-      case 'merchant': return `Merchant Coins: ${user?.merchant_coins || 0} • Scan QR codes to redeem`
-      case 'authority': return 'Manage reports & payments'
-      case 'admin': return 'System administration'
-      default: return 'Coastal civic engagement'
-    }
-  }
-
-  const navigationItems = [
-    { id: 'profile', label: '👤 Profile', action: () => navigate('/profile') },
-    { id: 'logout', label: '🚪 Logout', action: handleLogout }
-  ]
-
-  const closeMobileMenu = () => setIsMobileMenuOpen(false)
 
   return (
     <>
-      {/* Desktop Navigation */}
-      {!isMobile && (
-        <nav className="desktop-nav">
-          <h1 className="nav-title">
-            {getPageTitle()}
-          </h1>
-          
-          <div className="nav-actions">
-            <div className="nav-info">
-              {getPageInfo()}
+      {/* Sidebar Toggle Button */}
+      <button
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        className="sidebar-toggle"
+        aria-label="Toggle navigation"
+      >
+        <span className="toggle-icon">{isSidebarOpen ? '✕' : '☰'}</span>
+      </button>
+
+      {/* Professional Sidebar */}
+      <div className={`professional-sidebar ${isSidebarOpen ? 'open' : ''}`}>
+        {/* Sidebar Header */}
+        <div className="sidebar-header">
+          <button 
+            className="sidebar-close"
+            onClick={() => setIsSidebarOpen(false)}
+            aria-label="Close sidebar"
+          >
+            ✕
+          </button>
+          <div className="sidebar-logo">
+            <div className="logo-icon">🌊</div>
+            <div className="logo-text">
+              <div className="logo-title">Karavali Connect</div>
+              <div className="logo-subtitle">Coastal Management</div>
             </div>
-            <button onClick={handleLogout} className="btn btn-secondary">
-              🚪 Logout
-            </button>
           </div>
+        </div>
+
+        {/* User Profile Section */}
+        <div className="sidebar-profile">
+          <div className="profile-avatar">
+            {currentPage === 'user' ? '👤' : 
+             currentPage === 'merchant' ? '🏪' :
+             currentPage === 'authority' ? '🏛️' : '👑'}
+          </div>
+          <div className="profile-info">
+            <div className="profile-name">{user?.phone_number}</div>
+            <div className="profile-role">{user?.role?.replace('_', ' ')}</div>
+            <div className="profile-status">
+              {currentPage === 'user' && (
+                <><span className="status-icon">💰</span> {user?.coin_balance || 0} Coins</>
+              )}
+              {currentPage === 'merchant' && (
+                <><span className="status-icon">💰</span> {user?.merchant_coins || 0} Coins</>
+              )}
+              {(currentPage === 'authority' || currentPage === 'admin') && (
+                <><span className="status-icon">✅</span> Authorized</>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation Menu */}
+        <nav className="sidebar-nav">
+          {getNavigationItems().map((item) => (
+            <div key={item.id}>
+              {item.divider && <div className="nav-divider">{item.label}</div>}
+              {!item.divider && (
+                <button
+                  onClick={() => {
+                    item.action()
+                    setIsSidebarOpen(false)
+                  }}
+                  className={`nav-item ${item.isActive ? 'active' : ''}`}
+                >
+                  <span className="nav-icon">{item.icon}</span>
+                  <span className="nav-label">{item.label}</span>
+                </button>
+              )}
+            </div>
+          ))}
         </nav>
-      )}
+      </div>
 
-      {/* Mobile Navigation */}
-      {isMobile && (
-        <>
-          <nav className="mobile-nav">
-            <h1 className="mobile-nav-title">
-              {getPageTitle()}
-            </h1>
-            
-            <div className="mobile-nav-actions">
-              <div className="mobile-nav-info">
-                {currentPage === 'user' ? `${user?.coin_balance || 0} 🪙` : 
-                 currentPage === 'merchant' ? `${user?.merchant_coins || 0} 🪙` :
-                 getPageTitle().split(' ')[0]}
-              </div>
-              <button
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="mobile-menu-toggle"
-                aria-label="Toggle menu"
-              >
-                {isMobileMenuOpen ? '✕' : '☰'}
-              </button>
-            </div>
-          </nav>
-
-          {/* Mobile Sidebar Overlay */}
-          {isMobileMenuOpen && (
-            <div className="mobile-sidebar-overlay" onClick={closeMobileMenu}>
-              <div className="mobile-sidebar" onClick={(e) => e.stopPropagation()}>
-                <div className="mobile-sidebar-header">
-                  <h2>🌊 Karavali Connect</h2>
-                  <button 
-                    onClick={closeMobileMenu}
-                    className="mobile-sidebar-close"
-                    aria-label="Close menu"
-                  >
-                    ✕
-                  </button>
-                </div>
-                
-                <div className="mobile-sidebar-content">
-                  <div className="mobile-user-info">
-                    <div className="mobile-user-avatar">
-                      {currentPage === 'user' ? '👤' : 
-                       currentPage === 'merchant' ? '🏪' :
-                       currentPage === 'authority' ? '🏛️' : '👑'}
-                    </div>
-                    <div className="mobile-user-details">
-                      <div className="mobile-user-phone">{user?.phone_number}</div>
-                      <div className="mobile-user-role">{user?.role?.replace('_', ' ')}</div>
-                      <div className="mobile-user-coins">
-                        {currentPage === 'user' && `${user?.coin_balance || 0} Coins`}
-                        {currentPage === 'merchant' && `${user?.merchant_coins || 0} Merchant Coins`}
-                        {(currentPage === 'authority' || currentPage === 'admin') && 'Authority Access'}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="mobile-sidebar-menu">
-                    {navigationItems.map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => {
-                          item.action()
-                          closeMobileMenu()
-                        }}
-                        className="mobile-sidebar-item"
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </>
+      {/* Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="sidebar-overlay" 
+          onClick={() => setIsSidebarOpen(false)}
+        ></div>
       )}
     </>
   )

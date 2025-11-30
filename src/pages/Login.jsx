@@ -195,57 +195,7 @@ export default function Login() {
           </p>
         </div>
 
-        <div style={{
-          marginTop: '2rem',
-          paddingTop: '2rem',
-          borderTop: '1px solid var(--glass-border)',
-          textAlign: 'center'
-        }}>
-          <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.875rem', marginBottom: '1rem' }}>
-            Quick Access (Demo):
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault()
-                setPhone('9999999999')
-                setPassword('demo123')
-                setSelectedRole('tourist')
-              }}
-              className="btn btn-secondary"
-              style={{ width: '100%', fontSize: '0.875rem' }}
-            >
-              👤 Tourist Demo
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault()
-                setPhone('8888888888')
-                setPassword('demo123')
-                setSelectedRole('tourist')
-              }}
-              className="btn btn-secondary"
-              style={{ width: '100%', fontSize: '0.875rem' }}
-            >
-              🏪 Merchant Demo
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault()
-                setPhone('7777777777')
-                setPassword('admin123')
-                setSelectedRole('authority')
-              }}
-              className="btn btn-secondary"
-              style={{ width: '100%', fontSize: '0.875rem' }}
-            >
-              👑 Authority Demo
-            </button>
-          </div>
-        </div>
+
       </div>
     </div>
   )

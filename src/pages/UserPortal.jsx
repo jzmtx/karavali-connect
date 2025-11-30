@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import Navigation from '../components/Navigation'
 import MapView from '../components/MapView'
 import BinReporter from '../components/BinReporter'
@@ -14,7 +14,8 @@ import ManualLocationManager from '../components/ManualLocationManager'
 import { locationService } from '../services/locationService'
 
 export default function UserPortal({ user }) {
-  const [activeTab, setActiveTab] = useState('map')
+  const [searchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'map')
   const [coinBalance, setCoinBalance] = useState(0)
   const [pendingCoins, setPendingCoins] = useState(0)
   const [selectedBeach, setSelectedBeach] = useState(null)
@@ -27,23 +28,15 @@ export default function UserPortal({ user }) {
   useEffect(() => {
     loadUserData()
     initializeLocationService()
-  }, [user])
+    
+    // Update tab when URL changes
+    const tab = searchParams.get('tab')
+    if (tab && tab !== activeTab) {
+      setActiveTab(tab)
+    }
+  }, [user, searchParams])
 
-  useEffect(() => {
-    // Update location timer every minute (only for tourists)
-    const interval = setInterval(() => {
-      if (user && user.role === 'tourist') {
-        setLocationTimeRemaining(locationService.formatTimeRemaining())
-        
-        // Check if location needs update
-        if (locationService.needsLocationUpdate(user.role)) {
-          setLocationStatus({ valid: false, needsUpdate: true })
-        }
-      }
-    }, 60000)
-
-    return () => clearInterval(interval)
-  }, [])
+  // Removed location expiry timer - location is now permanent for all users
 
   useEffect(() => {
     if (selectedBeach) {
@@ -102,18 +95,31 @@ export default function UserPortal({ user }) {
     }
   }
 
-  const handleLocationUpdated = (result) => {
-    setLocationStatus({ valid: true, needsUpdate: false })
+  const handleLocationUpdated = async (result) => {
+    // Force refresh location status from database
+    try {
+      const freshStatus = await locationService.forceRefreshLocation(user.id, user.role)
+      setLocationStatus({
+        valid: freshStatus.success,
+        needsUpdate: !freshStatus.success,
+        isPermanent: freshStatus.isPermanent
+      })
+      setLocationTimeRemaining(freshStatus.timeRemaining || locationService.formatTimeRemaining())
+      
+      // Also reload user data to ensure everything is in sync
+      await loadUserData()
+    } catch (error) {
+      console.error('Error refreshing location status:', error)
+      // Fallback to optimistic update
+      setLocationStatus({ valid: true, needsUpdate: false })
+      setLocationTimeRemaining(locationService.formatTimeRemaining())
+    }
     setShowLocationPrompt(false)
-    setLocationTimeRemaining(locationService.formatTimeRemaining())
   }
 
   const handleLocationPromptCancel = () => {
     setShowLocationPrompt(false)
-    // Force switch to wallet or profile tab
-    if (!['wallet', 'profile'].includes(activeTab)) {
-      setActiveTab('wallet')
-    }
+    // User can manually choose which tab to go to
   }
 
   const requiresLocation = (tabId) => {
@@ -121,11 +127,7 @@ export default function UserPortal({ user }) {
   }
 
   const handleTabChange = (tabId) => {
-    // Only tourists need location verification
-    if (user.role === 'tourist' && requiresLocation(tabId) && !locationStatus.valid) {
-      setShowLocationPrompt(true)
-      return
-    }
+    // All users have permanent location access now
     setActiveTab(tabId)
   }
 
@@ -151,67 +153,49 @@ export default function UserPortal({ user }) {
     <div style={{ minHeight: '100vh' }}>
       <Navigation user={{...user, coin_balance: coinBalance}} currentPage="user" />
 
-      {/* Location Status Bar - Only for tourists */}
-      {user.role === 'tourist' && locationStatus.valid && locationTimeRemaining && (
-        <div className="container" style={{ marginTop: '1rem' }}>
-          <div className="bg-green-500/20 border border-green-500/30 rounded-lg p-3 text-center">
-            <p className="text-green-300 text-sm">
-              📍 Location valid - {locationTimeRemaining}
-            </p>
-          </div>
-        </div>
-      )}
 
-      {user.role === 'tourist' && !locationStatus.valid && (
-        <div className="container" style={{ marginTop: '1rem' }}>
-          <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-3 text-center">
-            <p className="text-yellow-300 text-sm">
-              ⚠️ Location expired - Update location to access all features
-            </p>
-          </div>
-        </div>
-      )}
 
-      {/* Tab Navigation */}
-      <div className="tab-nav container">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => handleTabChange(tab.id)}
-            className={`tab-btn ${activeTab === tab.id ? 'active' : ''} ${
-              user.role === 'tourist' && tab.requiresLocation && !locationStatus.valid ? 'opacity-50' : ''
-            }`}
-            title={user.role === 'tourist' && tab.requiresLocation && !locationStatus.valid ? 'Requires location update' : ''}
-          >
-            {tab.label}
-            {user.role === 'tourist' && tab.requiresLocation && !locationStatus.valid && (
-              <span className="ml-1 text-yellow-400">⚠️</span>
-            )}
-          </button>
-        ))}
-      </div>
+
 
       {/* Content */}
-      <main className="container main-content">
-        <div className="glass-card">
+      <main className="app-main">
+        <div className="content-container">
           {activeTab === 'map' && (
-            <>
-              <BeachSelector 
-                user={user} 
-                onBeachSelect={setSelectedBeach} 
-                selectedBeach={selectedBeach}
-              />
+            <div className="content-section">
+              <div className="section-header">
+                <div>
+                  <h2 className="section-title">🗺️ Interactive Map</h2>
+                  <p className="section-subtitle">Explore beaches, check conditions, and find locations</p>
+                </div>
+              </div>
+              <div className="enhanced-card">
+                <BeachSelector 
+                  user={user} 
+                  onBeachSelect={setSelectedBeach} 
+                  selectedBeach={selectedBeach}
+                />
+              </div>
               <MapView user={user} selectedBeach={selectedBeach} />
-            </>
+            </div>
           )}
           {activeTab === 'bin' && (
-            selectedBeach ? (
-              <BinReporter user={user} selectedBeach={selectedBeach} onUpdate={loadUserData} />
-            ) : (
-              <div style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.7)' }}>
-                Please select a beach from the Map tab first
+            <div className="content-section">
+              <div className="section-header">
+                <div>
+                  <h2 className="section-title">🗑️ Report Bin</h2>
+                  <p className="section-subtitle">Report overflowing bins and earn coins</p>
+                </div>
               </div>
-            )
+              {selectedBeach ? (
+                <BinReporter user={user} selectedBeach={selectedBeach} onUpdate={loadUserData} />
+              ) : (
+                <div className="enhanced-card" style={{ textAlign: 'center', padding: '3rem' }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🏖️</div>
+                  <h3 style={{ color: 'white', marginBottom: '0.5rem' }}>Select a Beach First</h3>
+                  <p style={{ color: 'rgba(255,255,255,0.7)' }}>Please select a beach from the Map tab to report bins</p>
+                </div>
+              )}
+            </div>
           )}
           {activeTab === 'cleanup' && (
             selectedBeach ? (
@@ -276,7 +260,17 @@ export default function UserPortal({ user }) {
               )}
             </div>
           )}
-          {activeTab === 'wallet' && <Wallet user={user} coinBalance={coinBalance} />}
+          {activeTab === 'wallet' && (
+            <div className="content-section">
+              <div className="section-header">
+                <div>
+                  <h2 className="section-title">💰 My Wallet</h2>
+                  <p className="section-subtitle">Manage your coins and view transaction history</p>
+                </div>
+              </div>
+              <Wallet user={user} coinBalance={coinBalance} />
+            </div>
+          )}
           {activeTab === 'profile' && (
             <div className="space-y-6">
               <div>
@@ -312,7 +306,8 @@ export default function UserPortal({ user }) {
                   {user.role === 'tourist' && !locationStatus.valid && (
                     <button
                       onClick={() => setShowLocationPrompt(true)}
-                      className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-200 mt-4"
+                      className="btn btn-primary"
+                      style={{ width: '100%', marginTop: '1rem' }}
                     >
                       📍 Update Location
                     </button>
@@ -320,7 +315,8 @@ export default function UserPortal({ user }) {
                   
                   <button
                     onClick={handleLogout}
-                    className="w-full bg-gray-600/50 hover:bg-gray-600/70 text-gray-300 font-medium py-3 px-4 rounded-xl transition-all duration-200 mt-4"
+                    className="btn btn-secondary"
+                    style={{ width: '100%', marginTop: '1rem' }}
                   >
                     🚪 Logout
                   </button>

@@ -135,7 +135,7 @@ const ManualLocationManager = ({ user }) => {
         <h3 className="text-lg font-semibold text-white">📍 My Locations</h3>
         <button
           onClick={() => setShowAddForm(!showAddForm)}
-          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200"
+          className="btn btn-primary"
         >
           {showAddForm ? 'Cancel' : '+ Add Location'}
         </button>
@@ -210,7 +210,8 @@ const ManualLocationManager = ({ user }) => {
             <button
               onClick={getCurrentLocation}
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white py-2 px-4 rounded-lg font-medium transition-all duration-200"
+              className="btn btn-secondary"
+              style={{ width: '100%' }}
             >
               {loading ? 'Getting Location...' : '📍 Use Current Location'}
             </button>
@@ -232,7 +233,8 @@ const ManualLocationManager = ({ user }) => {
               <button
                 onClick={addLocation}
                 disabled={loading || !newLocation.name || !newLocation.lat || !newLocation.lng}
-                className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white py-3 px-4 rounded-lg font-medium transition-all duration-200"
+                className="btn btn-primary"
+                style={{ flex: 1 }}
               >
                 {loading ? 'Adding...' : 'Add Location'}
               </button>
@@ -242,7 +244,7 @@ const ManualLocationManager = ({ user }) => {
                   setNewLocation({ name: '', lat: '', lng: '', address: '' });
                   setError('');
                 }}
-                className="px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-all duration-200"
+                className="btn btn-secondary"
               >
                 Cancel
               </button>
@@ -281,8 +283,9 @@ const ManualLocationManager = ({ user }) => {
                 <button
                   onClick={() => removeLocation(location.id)}
                   disabled={loading}
-                  className="bg-red-600/50 hover:bg-red-600 disabled:bg-gray-600 text-white p-2 rounded-lg transition-all duration-200"
+                  className="btn btn-secondary"
                   title="Remove location"
+                  style={{ padding: '0.5rem', minHeight: 'auto' }}
                 >
                   🗑️
                 </button>

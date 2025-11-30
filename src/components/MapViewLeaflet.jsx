@@ -354,11 +354,20 @@ export default function MapViewLeaflet({ user }) {
   }
 
   return (
-    <div>
-      {/* Location Search */}
-      <div style={{ marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
-          <div style={{ flex: 1, position: 'relative' }}>
+    <div className="map-container">
+      {/* Enhanced Map Header */}
+      <div className="map-header">
+        <div className="map-title-section">
+          <h2 className="map-title">🗺️ Interactive Beach Map</h2>
+          <p className="map-subtitle">Explore beaches, check safety conditions, and find locations</p>
+        </div>
+      </div>
+
+      {/* Enhanced Location Search */}
+      <div className="map-search-section">
+        <div className="search-container">
+          <div className="search-input-wrapper">
+            <div className="search-icon">🔍</div>
             <input
               type="text"
               value={searchQuery}
@@ -366,173 +375,147 @@ export default function MapViewLeaflet({ user }) {
                 setSearchQuery(e.target.value)
                 searchLocation(e.target.value)
               }}
-              placeholder="Search beach locations..."
-              className="form-input"
-              style={{ paddingRight: isSearching ? '3rem' : undefined }}
+              placeholder="Search beaches, locations, or coordinates..."
+              className="map-search-input"
             />
             {isSearching && (
-              <div style={{
-                position: 'absolute',
-                right: '1rem',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--accent-red)',
-                fontSize: '1.25rem'
-              }}>
-                🔍
+              <div className="search-loading">
+                <div className="search-spinner"></div>
               </div>
             )}
           </div>
           <button
             onClick={getCurrentLocation}
-            className="btn btn-primary"
-            style={{ whiteSpace: 'nowrap' }}
+            className="current-location-btn"
           >
-            📍 Current Location
+            <span className="location-icon">📍</span>
+            <span className="location-text">My Location</span>
           </button>
         </div>
 
-        {/* Search Results */}
+        {/* Enhanced Search Results */}
         {searchResults.length > 0 && (
-          <div style={{
-            background: 'var(--glass-bg)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid var(--glass-border)',
-            borderRadius: '12px',
-            maxHeight: '200px',
-            overflowY: 'auto'
-          }}>
-            {searchResults.map((result, index) => (
-              <button
-                key={index}
-                onClick={() => goToLocation(result.lat, result.lng, result.name)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem',
-                  textAlign: 'left',
-                  color: 'white',
-                  background: 'transparent',
-                  border: 'none',
-                  borderBottom: index < searchResults.length - 1 ? '1px solid var(--glass-border)' : 'none',
-                  cursor: 'pointer',
-                  transition: 'background 0.2s ease'
-                }}
-                onMouseEnter={(e) => e.target.style.background = 'rgba(220,20,60,0.2)'}
-                onMouseLeave={(e) => e.target.style.background = 'transparent'}
+          <div className="search-results">
+            <div className="search-results-header">
+              <span className="results-count">{searchResults.length} locations found</span>
+              <button 
+                onClick={() => { setSearchResults([]); setSearchQuery('') }}
+                className="clear-results-btn"
               >
-                <div style={{ fontWeight: '500', fontSize: '0.875rem', marginBottom: '0.25rem' }}>
-                  🏖️ {result.name}
-                </div>
-                <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)' }}>
-                  {result.fullName || result.name}
-                </div>
-                <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)', marginTop: '0.25rem' }}>
-                  📍 {result.lat.toFixed(4)}, {result.lng.toFixed(4)}
-                </div>
+                ✕
               </button>
-            ))}
+            </div>
+            <div className="search-results-list">
+              {searchResults.map((result, index) => (
+                <button
+                  key={index}
+                  onClick={() => goToLocation(result.lat, result.lng, result.name)}
+                  className="search-result-item"
+                >
+                  <div className="result-icon">🏖️</div>
+                  <div className="result-content">
+                    <div className="result-name">{result.name}</div>
+                    <div className="result-address">{result.fullName || result.name}</div>
+                    <div className="result-coords">
+                      📍 {result.lat.toFixed(4)}, {result.lng.toFixed(4)}
+                    </div>
+                  </div>
+                  <div className="result-arrow">→</div>
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
 
-      <div 
-        ref={mapContainer} 
-        style={{ 
-          width: '100%', 
-          height: '500px', 
-          borderRadius: '8px', 
-          overflow: 'hidden',
-          minHeight: '500px',
-          position: 'relative',
-          zIndex: 0,
-          background: '#e5e7eb'
-        }} 
-      />
+      {/* Enhanced Map Container */}
+      <div className="map-wrapper">
+        <div className="map-controls">
+          <div className="map-legend">
+            <div className="legend-item">
+              <span className="legend-marker safe"></span>
+              <span>Safe Areas</span>
+            </div>
+            <div className="legend-item">
+              <span className="legend-marker caution"></span>
+              <span>Caution Areas</span>
+            </div>
+            <div className="legend-item">
+              <span className="legend-marker danger"></span>
+              <span>Danger Areas</span>
+            </div>
+          </div>
+        </div>
+        
+        <div 
+          ref={mapContainer} 
+          className="interactive-map"
+        />
+        
+        {!selectedPin && (
+          <div className="map-instructions">
+            <div className="instruction-item">
+              <span className="instruction-icon">👆</span>
+              <span>Click on the map to get location info</span>
+            </div>
+            <div className="instruction-item">
+              <span className="instruction-icon">🔍</span>
+              <span>Search for specific beaches above</span>
+            </div>
+          </div>
+        )}
+      </div>
 
       {selectedPin && (
-        <div style={{
-          marginTop: '1.5rem',
-          background: 'var(--glass-bg)',
-          backdropFilter: 'blur(10px)',
-          border: '1px solid var(--glass-border)',
-          padding: '1rem',
-          borderRadius: '12px'
-        }}>
-          <h3 style={{ color: 'white', fontWeight: '600', marginBottom: '0.5rem' }}>
-            📍 Location Safety
-          </h3>
-          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.875rem', marginBottom: '1rem' }}>
-            {selectedPin.gps_lat.toFixed(6)}, {selectedPin.gps_lng.toFixed(6)}
-          </p>
+        <div className="location-info-panel">
+          <div className="location-header">
+            <h3 className="location-title">📍 Location Details</h3>
+            <button 
+              onClick={() => setSelectedPin(null)}
+              className="close-btn"
+            >
+              ✕
+            </button>
+          </div>
 
           {beachConditions && (
-            <div style={{
-              background: 'rgba(59, 130, 246, 0.2)',
-              border: '1px solid rgba(59, 130, 246, 0.3)',
-              padding: '1rem',
-              borderRadius: '8px',
-              marginBottom: '1rem'
-            }}>
-              <h4 style={{ color: 'rgb(147, 197, 253)', fontWeight: '500', marginBottom: '0.75rem' }}>
-                🏖️ Beach Conditions
-              </h4>
-              
-              {/* Safety Status */}
-              <div style={{
-                padding: '0.75rem',
-                borderRadius: '8px',
-                textAlign: 'center',
-                fontWeight: '600',
-                marginBottom: '1rem',
-                background: `${beachConditions.safetyColor}33`,
-                color: beachConditions.safetyColor,
-                border: `1px solid ${beachConditions.safetyColor}66`
+            <div className="conditions-card">
+              <div className="safety-status" style={{
+                background: `${beachConditions.safetyColor}20`,
+                borderColor: `${beachConditions.safetyColor}60`,
+                color: beachConditions.safetyColor
               }}>
-                {beachConditions.safetyLevel === 'safe' ? '✅' : beachConditions.safetyLevel === 'caution' ? '⚠️' : '🚨'} {beachConditions.safetyText}
+                <span className="safety-icon">
+                  {beachConditions.safetyLevel === 'safe' ? '✅' : 
+                   beachConditions.safetyLevel === 'caution' ? '⚠️' : '🚨'}
+                </span>
+                <span className="safety-text">{beachConditions.safetyText}</span>
               </div>
 
-              {/* Weather Data */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.875rem', marginBottom: '1rem' }}>
-                <div style={{ color: 'rgb(147, 197, 253)' }}>
-                  <strong>Wave Height:</strong> {beachConditions.waveHeight?.toFixed(1) || 'N/A'}m
+              <div className="weather-grid">
+                <div className="weather-item">
+                  <div className="weather-value">🌊 {beachConditions.waveHeight?.toFixed(1) || 'N/A'}m</div>
+                  <div className="weather-label">Waves</div>
                 </div>
-                <div style={{ color: 'rgb(147, 197, 253)' }}>
-                  <strong>Wind Speed:</strong> {beachConditions.windSpeed?.toFixed(0) || 'N/A'} km/h
+                <div className="weather-item">
+                  <div className="weather-value">💨 {beachConditions.windSpeed?.toFixed(0) || 'N/A'}</div>
+                  <div className="weather-label">Wind km/h</div>
                 </div>
                 {beachConditions.windGusts > beachConditions.windSpeed + 5 && (
-                  <div style={{ color: 'rgb(252, 165, 165)' }}>
-                    <strong>Wind Gusts:</strong> {beachConditions.windGusts?.toFixed(0)} km/h
+                  <div className="weather-item danger">
+                    <div className="weather-value">💨 {beachConditions.windGusts?.toFixed(0)}</div>
+                    <div className="weather-label">Gusts</div>
                   </div>
                 )}
-                {beachConditions.maxWaveHeight > beachConditions.waveHeight + 0.3 && (
-                  <div style={{ color: 'rgb(252, 165, 165)' }}>
-                    <strong>Max Waves:</strong> {beachConditions.maxWaveHeight?.toFixed(1)}m
-                  </div>
-                )}
-              </div>
-
-              {/* Detailed Conditions */}
-              <div style={{ fontSize: '0.8rem', color: 'rgb(147, 197, 253)' }}>
-                <strong>Current Conditions:</strong>
-                <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
-                  {beachConditions.conditions?.map((condition, index) => (
-                    <li key={index} style={{ marginBottom: '0.25rem' }}>{condition}</li>
-                  ))}
-                </ul>
               </div>
             </div>
           )}
 
           {selectedPin.report_count > 0 && (
-            <div style={{
-              padding: '0.75rem',
-              borderRadius: '8px',
-              textAlign: 'center',
-              fontWeight: '600',
-              color: 'white',
+            <div className="danger-alert" style={{
               backgroundColor: getDangerColor(selectedPin.danger_level)
             }}>
-              {selectedPin.report_count} Report{selectedPin.report_count > 1 ? 's' : ''} • {selectedPin.danger_level.toUpperCase()} Risk
+              ⚠️ {selectedPin.report_count} Report{selectedPin.report_count > 1 ? 's' : ''} • {selectedPin.danger_level.toUpperCase()}
             </div>
           )}
         </div>
