@@ -34,11 +34,12 @@ export default function Navigation({ user, currentPage }) {
       {/* Desktop Navigation */}
       <nav style={{
         background: 'var(--dark-gradient)',
-        padding: '0.75rem 2rem',
+        padding: 'clamp(0.5rem, 2vw, 0.75rem) clamp(1rem, 4vw, 2rem)',
         borderBottom: '1px solid var(--glass-border)',
         display: window.innerWidth >= 1024 ? 'flex' : 'none',
         justifyContent: 'space-between',
-        alignItems: 'center'
+        alignItems: 'center',
+        minHeight: '60px'
       }}>
         <h1 style={{ fontSize: '1.25rem', margin: 0, color: 'white' }}>
           🌊 Karavali Connect
@@ -64,12 +65,15 @@ export default function Navigation({ user, currentPage }) {
       {/* Mobile Navigation */}
       <nav style={{
         background: 'var(--dark-gradient)',
-        padding: '0.75rem 1rem',
+        padding: 'clamp(0.5rem, 3vw, 0.75rem) clamp(0.75rem, 4vw, 1rem)',
         borderBottom: '1px solid var(--glass-border)',
         display: window.innerWidth < 1024 ? 'flex' : 'none',
         justifyContent: 'space-between',
         alignItems: 'center',
-        position: 'relative'
+        position: 'relative',
+        minHeight: '56px',
+        width: '100%',
+        boxSizing: 'border-box'
       }}>
         <h1 style={{ fontSize: '1.125rem', fontWeight: 'bold', margin: 0, color: 'white' }}>
           🌊 Karavali Connect
