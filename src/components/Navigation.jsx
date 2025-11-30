@@ -34,19 +34,33 @@ export default function Navigation({ user, currentPage, tabs, activeTab, onTabCh
         { id: 'logout', label: 'Logout', icon: '🚪', action: handleLogout }
       ]
     } else if (currentPage === 'merchant') {
-      return [
+      const merchantItems = [
         ...commonItems,
-        { id: 'dashboard', label: 'Dashboard', icon: '📊', action: () => navigate('/dashboard') },
-        { id: 'business', label: 'Business', icon: '🏢', divider: true },
-        { id: 'register', label: 'Beach Registration', icon: '🏖️', action: () => navigate('/merchant?tab=register') },
-        { id: 'scan', label: 'Scan Customer QR', icon: '📷', action: () => navigate('/merchant?tab=scan') },
-        { id: 'payments', label: 'Payment Requests', icon: '💳', action: () => navigate('/merchant?tab=payments') },
-        { id: 'account', label: 'Account', icon: '⚙️', divider: true },
-        { id: 'profile', label: 'Profile Settings', icon: '👤', action: () => navigate('/merchant?tab=profile') },
-        { id: 'logout', label: 'Logout', icon: '🚪', action: handleLogout }
+        { id: 'business', label: 'Business', icon: '🏢', divider: true }
       ]
+      
+      // Add dynamic tabs from MerchantPortal
+      if (tabs) {
+        tabs.forEach(tab => {
+          merchantItems.push({
+            id: tab.id,
+            label: tab.label,
+            icon: tab.icon,
+            action: () => onTabChange(tab.id),
+            isActive: activeTab === tab.id
+          })
+        })
+      }
+      
+      merchantItems.push(
+        { id: 'account', label: 'Account', icon: '⚙️', divider: true },
+        { id: 'logout', label: 'Logout', icon: '🚪', action: handleLogout }
+      )
+      
+      return merchantItems
     } else if (currentPage === 'authority') {
       const authorityItems = [
+        ...commonItems,
         { id: 'management', label: 'Management', icon: '🏛️', divider: true }
       ]
       
