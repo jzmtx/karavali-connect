@@ -3,9 +3,13 @@ import { supabase } from '../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import QRScanner from '../components/QRScanner'
 import Navigation from '../components/Navigation'
+import MerchantBeachRegistration from '../components/MerchantBeachRegistration'
+import LocationUpdatePrompt from '../components/LocationUpdatePrompt'
+import { locationService } from '../services/locationService'
 
 export default function MerchantPortal({ user }) {
-  const [activeTab, setActiveTab] = useState('scan')
+  const [activeTab, setActiveTab] = useState('register')
+  const [isRegistered, setIsRegistered] = useState(false)
   const [scannedData, setScannedData] = useState(null)
   const [userData, setUserData] = useState(null)
   const [billAmount, setBillAmount] = useState('')
@@ -17,12 +21,70 @@ export default function MerchantPortal({ user }) {
   const [paymentRequests, setPaymentRequests] = useState([])
   const [showPaymentForm, setShowPaymentForm] = useState(false)
   const [paymentCoins, setPaymentCoins] = useState('')
+  const [locationStatus, setLocationStatus] = useState({ valid: true, needsUpdate: false })
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false)
+  const [locationTimeRemaining, setLocationTimeRemaining] = useState('')
   const navigate = useNavigate()
 
   useEffect(() => {
     loadMerchantData()
     loadPaymentRequests()
+    checkRegistrationStatus()
+    initializeLocationService()
   }, [user])
+
+  useEffect(() => {
+    // Update location timer every minute
+    const interval = setInterval(() => {
+      setLocationTimeRemaining(locationService.formatTimeRemaining())
+      
+      // Check if location needs update
+      if (locationService.needsLocationUpdate()) {
+        setLocationStatus({ valid: false, needsUpdate: true })
+      }
+    }, 60000)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  const initializeLocationService = async () => {
+    if (!user) return
+    
+    try {
+      const result = await locationService.initializeForUser(user.id)
+      setLocationStatus({
+        valid: result.success,
+        needsUpdate: result.needsUpdate
+      })
+      
+      if (result.success) {
+        setLocationTimeRemaining(result.timeRemaining)
+      }
+    } catch (error) {
+      console.error('Error initializing location service:', error)
+      setLocationStatus({ valid: false, needsUpdate: true })
+    }
+  }
+
+  const checkRegistrationStatus = async () => {
+    if (!user) return
+    
+    try {
+      const { data, error } = await supabase
+        .from('beach_merchants')
+        .select('*')
+        .eq('merchant_id', user.id)
+        .eq('is_active', true)
+        .single()
+      
+      if (data) {
+        setIsRegistered(true)
+        setActiveTab('scan')
+      }
+    } catch (err) {
+      setIsRegistered(false)
+    }
+  }
 
   const handleQRScan = async (qrData) => {
     try {
@@ -139,9 +201,9 @@ export default function MerchantPortal({ user }) {
 
       if (redemptionError) throw redemptionError
 
-      // Use atomic transaction function
+      // Use atomic transaction function with beach tracking
       const { data: transactionResult, error: transactionError } = await supabase
-        .rpc('process_merchant_redemption', {
+        .rpc('process_merchant_redemption_with_beach', {
           merchant_id_param: user.id,
           user_id_param: scannedData.userId,
           coins_param: coinsToUse,
@@ -163,7 +225,7 @@ export default function MerchantPortal({ user }) {
         .delete()
         .eq('redemption_id', redemption.redemption_id)
 
-      setMessage(`✅ Success! Customer redeemed ${coinsToUse} coins for ₹${discount.toFixed(2)} discount. Final amount: ₹${finalAmount.toFixed(2)}. You earned ${coinsToUse} merchant coins!`)
+      setMessage(`✅ Success! Customer redeemed ${coinsToUse} coins for ₹${discount.toFixed(2)} discount. Final amount: ₹${finalAmount.toFixed(2)}. You earned ${coinsToUse} merchant coins! Payment will be processed by ${transactionResult.beach_id} beach authority.`)
       setScannedData(null)
       setUserData(null)
       setBillAmount('')
@@ -223,7 +285,34 @@ export default function MerchantPortal({ user }) {
     }
   }
 
+  const handleLocationUpdated = (result) => {
+    setLocationStatus({ valid: true, needsUpdate: false })
+    setShowLocationPrompt(false)
+    setLocationTimeRemaining(locationService.formatTimeRemaining())
+  }
+
+  const handleLocationPromptCancel = () => {
+    setShowLocationPrompt(false)
+    // Force switch to payments tab (wallet equivalent for merchants)
+    if (!['payments', 'profile'].includes(activeTab)) {
+      setActiveTab('payments')
+    }
+  }
+
+  const requiresLocation = (tabId) => {
+    return ['register', 'scan'].includes(tabId)
+  }
+
+  const handleTabChange = (tabId) => {
+    if (requiresLocation(tabId) && !locationStatus.valid) {
+      setShowLocationPrompt(true)
+      return
+    }
+    setActiveTab(tabId)
+  }
+
   const handleLogout = () => {
+    locationService.clearLocation()
     localStorage.removeItem('karavali_user')
     window.dispatchEvent(new Event('karavali_user_changed'))
     navigate('/login', { replace: true })
@@ -233,19 +322,63 @@ export default function MerchantPortal({ user }) {
     <div style={{ minHeight: '100vh' }}>
       <Navigation user={user} currentPage="merchant" />
 
+      {/* Location Status Bar */}
+      {locationStatus.valid && locationTimeRemaining && (
+        <div className="container" style={{ marginTop: '1rem' }}>
+          <div className="bg-green-500/20 border border-green-500/30 rounded-lg p-3 text-center">
+            <p className="text-green-300 text-sm">
+              📍 Location valid - {locationTimeRemaining}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {!locationStatus.valid && (
+        <div className="container" style={{ marginTop: '1rem' }}>
+          <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-3 text-center">
+            <p className="text-yellow-300 text-sm">
+              ⚠️ Location expired - Update location to access registration and scanning
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="tab-nav container">
         <button
-          onClick={() => setActiveTab('scan')}
-          className={`tab-btn ${activeTab === 'scan' ? 'active' : ''}`}
+          onClick={() => handleTabChange('register')}
+          className={`tab-btn ${activeTab === 'register' ? 'active' : ''} ${
+            !locationStatus.valid ? 'opacity-50' : ''
+          }`}
+          title={!locationStatus.valid ? 'Requires location update' : ''}
+        >
+          🏖️ Beach Registration
+          {!locationStatus.valid && <span className="ml-1 text-yellow-400">⚠️</span>}
+        </button>
+        <button
+          onClick={() => handleTabChange('scan')}
+          className={`tab-btn ${activeTab === 'scan' ? 'active' : ''} ${
+            (!isRegistered || !locationStatus.valid) ? 'opacity-50' : ''
+          }`}
+          disabled={!isRegistered}
+          title={!isRegistered ? 'Requires beach registration' : !locationStatus.valid ? 'Requires location update' : ''}
         >
           📷 Scan QR
+          {!locationStatus.valid && <span className="ml-1 text-yellow-400">⚠️</span>}
         </button>
         <button
           onClick={() => setActiveTab('payments')}
           className={`tab-btn ${activeTab === 'payments' ? 'active' : ''}`}
+          disabled={!isRegistered}
+          style={{ opacity: isRegistered ? 1 : 0.5 }}
         >
           💰 Payment Requests
+        </button>
+        <button
+          onClick={() => setActiveTab('profile')}
+          className={`tab-btn ${activeTab === 'profile' ? 'active' : ''}`}
+        >
+          👤 Profile
         </button>
       </div>
 
@@ -262,7 +395,18 @@ export default function MerchantPortal({ user }) {
           </div>
         )}
 
-        {activeTab === 'scan' && (
+        {activeTab === 'register' && (
+          <MerchantBeachRegistration 
+            user={user} 
+            onRegistrationComplete={(data) => {
+              setIsRegistered(true)
+              setActiveTab('scan')
+              setMessage(`Successfully registered at ${data.beach_name}!`)
+            }}
+          />
+        )}
+
+        {activeTab === 'scan' && isRegistered && (
           <>
             <div className="glass-card">
               <h2>Scan Customer QR Code</h2>
@@ -344,7 +488,23 @@ export default function MerchantPortal({ user }) {
             </button>
           </div>
         )}
-        </>)}
+        </>
+        )}
+
+        {activeTab === 'scan' && !isRegistered && (
+          <div className="glass-card" style={{ textAlign: 'center', padding: '2rem' }}>
+            <h3 style={{ color: 'white', marginBottom: '1rem' }}>🏖️ Beach Registration Required</h3>
+            <p style={{ color: 'rgba(255,255,255,0.7)', marginBottom: '1.5rem' }}>
+              Please register your business at a beach location before you can scan customer QR codes.
+            </p>
+            <button
+              onClick={() => setActiveTab('register')}
+              className="btn btn-primary"
+            >
+              Go to Registration
+            </button>
+          </div>
+        )}
 
         {activeTab === 'payments' && (
           <div className="glass-card p-6">
@@ -438,7 +598,79 @@ export default function MerchantPortal({ user }) {
             )}
           </div>
         )}
+
+        {activeTab === 'profile' && (
+          <div className="glass-card">
+            <h2 style={{ color: 'white', marginBottom: '1rem' }}>👤 Profile</h2>
+            <div style={{
+              background: 'var(--glass-bg)',
+              padding: '1.5rem',
+              borderRadius: '12px',
+              border: '1px solid var(--glass-border)'
+            }}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.875rem' }}>Phone Number</label>
+                <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: '500' }}>
+                  {user.phone_number}
+                </div>
+              </div>
+              
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.875rem' }}>Role</label>
+                <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: '500', textTransform: 'capitalize' }}>
+                  {user.role.replace('_', ' ')}
+                </div>
+              </div>
+              
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.875rem' }}>Merchant Coins</label>
+                <div style={{ color: '#10b981', fontSize: '1.1rem', fontWeight: '500' }}>
+                  {merchantCoins} coins (₹{(merchantCoins * 0.10).toFixed(2)})
+                </div>
+              </div>
+              
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.875rem' }}>Registration Status</label>
+                <div style={{ color: isRegistered ? '#10b981' : '#f59e0b', fontSize: '1.1rem', fontWeight: '500' }}>
+                  {isRegistered ? '✅ Registered at Beach' : '⚠️ Not Registered'}
+                </div>
+              </div>
+              
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.875rem' }}>Location Status</label>
+                <div style={{ color: locationStatus.valid ? '#10b981' : '#f59e0b', fontSize: '1.1rem', fontWeight: '500' }}>
+                  {locationStatus.valid ? `✅ Valid (${locationTimeRemaining})` : '⚠️ Expired - Update Required'}
+                </div>
+              </div>
+              
+              {!locationStatus.valid && (
+                <button
+                  onClick={() => setShowLocationPrompt(true)}
+                  className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-200 mt-4"
+                >
+                  📍 Update Location
+                </button>
+              )}
+              
+              <button
+                onClick={handleLogout}
+                className="w-full bg-gray-600/50 hover:bg-gray-600/70 text-gray-300 font-medium py-3 px-4 rounded-xl transition-all duration-200 mt-4"
+              >
+                🚪 Logout
+              </button>
+            </div>
+          </div>
+        )}
       </main>
+
+      {/* Location Update Prompt */}
+      {showLocationPrompt && (
+        <LocationUpdatePrompt
+          user={user}
+          onLocationUpdated={handleLocationUpdated}
+          onCancel={handleLocationPromptCancel}
+        />
+      )}
     </div>
   )
 }

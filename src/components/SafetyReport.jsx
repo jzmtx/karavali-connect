@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { uploadImage } from '../services/cloudinary'
 import { sendTelegramAlert } from '../services/telegram'
+import { activityVerificationService } from '../services/activityVerificationService'
 
-export default function SafetyReport({ user }) {
+export default function SafetyReport({ user, selectedBeach }) {
   const [reportType, setReportType] = useState('')
   const [description, setDescription] = useState('')
   const [photo, setPhoto] = useState(null)
@@ -14,25 +15,15 @@ export default function SafetyReport({ user }) {
 
   const getLocation = async () => {
     try {
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          resolve, 
-          reject,
-          {
-            enableHighAccuracy: true,
-            timeout: 15000,
-            maximumAge: 0
-          }
-        )
-      })
+      const position = await activityVerificationService.getCurrentGPS()
       setLocation({
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
-        accuracy: position.coords.accuracy,
-        speed: position.coords.speed || 0
+        lat: position.lat,
+        lng: position.lng,
+        accuracy: position.accuracy,
+        speed: 0
       })
     } catch (err) {
-      setError('Failed to get location. Please enable GPS.')
+      setError(err.message || 'Failed to get location. Please enable GPS.')
     }
   }
 
@@ -46,10 +37,40 @@ export default function SafetyReport({ user }) {
       return
     }
 
+    if (!selectedBeach) {
+      setError('Please select a beach first')
+      return
+    }
+
     setLoading(true)
     setError('')
 
     try {
+      // Verify real-time GPS location for safety report
+      const verification = await activityVerificationService.verifyActivityLocation(
+        user.id,
+        selectedBeach.beach_id,
+        'safety_report'
+      )
+
+      const verificationResult = activityVerificationService.formatVerificationResult(verification)
+      
+      if (!verificationResult.success) {
+        throw new Error(verificationResult.message)
+      }
+
+      // Check GPS accuracy
+      if (!activityVerificationService.isAccuracySufficient(verification.accuracy, 'safety_report')) {
+        throw new Error(`GPS accuracy too low (${Math.round(verification.accuracy)}m). Please wait for better signal or move to open area.`)
+      }
+
+      // Use verified location
+      const verifiedLocation = {
+        lat: verification.currentLocation.lat,
+        lng: verification.currentLocation.lng,
+        accuracy: verification.accuracy
+      }
+
       let imageUrl = null
       if (photo) {
         imageUrl = await uploadImage(photo)
@@ -64,7 +85,7 @@ export default function SafetyReport({ user }) {
       let nearbyPin = null
       if (existingPins) {
         nearbyPin = existingPins.find(pin => {
-          const distance = getDistance(location.lat, location.lng, pin.gps_lat, pin.gps_lng)
+          const distance = getDistance(verifiedLocation.lat, verifiedLocation.lng, pin.gps_lat, pin.gps_lng)
           return distance < 0.001 // ~100 meters
         })
       }
@@ -90,32 +111,34 @@ export default function SafetyReport({ user }) {
         await supabase
           .from('safety_pins')
           .insert({
-            gps_lat: location.lat,
-            gps_lng: location.lng,
+            gps_lat: verifiedLocation.lat,
+            gps_lng: verifiedLocation.lng,
             report_count: 1,
             danger_level: 'low'
           })
       }
 
-      // Create report with live location tracking
+      // Create report with real-time GPS verification
       await supabase
         .from('reports')
         .insert({
           user_id: user.id,
           type: reportType === 'net' ? 'net' : 'danger',
           status: 'pending',
-          gps_lat: location.lat,
-          gps_lng: location.lng,
+          beach_id: selectedBeach.beach_id,
+          gps_lat: verifiedLocation.lat,
+          gps_lng: verifiedLocation.lng,
           image_before_url: imageUrl,
-          description: `${description} - Live location verified (Accuracy: ${location.accuracy}m, Speed: ${location.speed}m/s)`
+          description: `${description} - Real-time GPS verified at ${selectedBeach.name} (Accuracy: ${Math.round(verifiedLocation.accuracy)}m, Distance: ${Math.round(verification.distance)}m)`
         })
 
       // Send Telegram alert
       await sendTelegramAlert(reportType, {
-        lat: location.lat,
-        lng: location.lng,
+        lat: verifiedLocation.lat,
+        lng: verifiedLocation.lng,
         imageUrl: imageUrl,
-        description: description
+        description: description,
+        beachName: selectedBeach.name
       })
 
       setMessage('✅ Safety report submitted! Authorities have been notified.')
@@ -256,27 +279,43 @@ export default function SafetyReport({ user }) {
           marginBottom: '1rem',
           fontSize: '0.875rem'
         }}>
-          📍 Location: {location.lat.toFixed(6)}, {location.lng.toFixed(6)} (±{location.accuracy}m)
+          📍 Location: {location.lat.toFixed(6)}, {location.lng.toFixed(6)} (±{Math.round(location.accuracy)}m)
+          {selectedBeach && (
+            <div style={{ marginTop: '0.25rem', color: '#059669' }}>
+              🏖️ Beach: {selectedBeach.name}
+            </div>
+          )}
         </div>
       )}
 
       <button
         onClick={handleSubmit}
-        disabled={loading || !reportType || !location}
+        disabled={loading || !reportType || !location || !selectedBeach}
         style={{
           width: '100%',
           padding: '0.75rem',
-          background: loading || !reportType || !location ? '#9ca3af' : '#ef4444',
+          background: loading || !reportType || !location || !selectedBeach ? '#9ca3af' : '#ef4444',
           color: 'white',
           border: 'none',
           borderRadius: '8px',
           fontSize: '1rem',
           fontWeight: '600',
-          cursor: loading || !reportType || !location ? 'not-allowed' : 'pointer'
+          cursor: loading || !reportType || !location || !selectedBeach ? 'not-allowed' : 'pointer'
         }}
       >
-        {loading ? 'Submitting...' : 'Submit Safety Report'}
+        {loading ? 'Verifying Location...' : 'Submit Safety Report'}
       </button>
+
+      <div style={{
+        marginTop: '1rem',
+        padding: '0.75rem',
+        background: '#fef3c7',
+        borderRadius: '8px',
+        fontSize: '0.875rem',
+        color: '#92400e'
+      }}>
+        ⚠️ <strong>Note:</strong> Your exact GPS location will be verified when submitting the report for accuracy.
+      </div>
 
       <div style={{
         marginTop: '1rem',

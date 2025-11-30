@@ -4,8 +4,9 @@ import { uploadImage } from '../services/cloudinary'
 import { detectTrash, verifyCleanup } from '../services/ai'
 import { config } from '../lib/config'
 import CameraCapture from './CameraCapture'
+import { activityVerificationService } from '../services/activityVerificationService'
 
-export default function BeachCleanup({ user, onUpdate }) {
+export default function BeachCleanup({ user, selectedBeach, onUpdate }) {
   const [step, setStep] = useState('start') // 'start', 'before', 'cleaning', 'after', 'done'
   const [beforeImage, setBeforeImage] = useState(null)
   const [afterImage, setAfterImage] = useState(null)
@@ -153,18 +154,26 @@ export default function BeachCleanup({ user, onUpdate }) {
         return
       }
 
-      // Get live location with high accuracy
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          resolve,
-          reject,
-          { 
-            enableHighAccuracy: true,
-            timeout: 15000,
-            maximumAge: 0
-          }
-        )
-      })
+      // Verify real-time GPS location for activity
+      const verification = await activityVerificationService.verifyActivityLocation(
+        user.id,
+        selectedBeach.beach_id,
+        'cleanup'
+      )
+
+      const verificationResult = activityVerificationService.formatVerificationResult(verification)
+      
+      if (!verificationResult.success) {
+        throw new Error(verificationResult.message)
+      }
+
+      // Check GPS accuracy
+      if (!activityVerificationService.isAccuracySufficient(verification.accuracy, 'cleanup')) {
+        throw new Error(`GPS accuracy too low (${Math.round(verification.accuracy)}m). Please wait for better signal or move to open area.`)
+      }
+
+      const userLat = verification.currentLocation.lat
+      const userLng = verification.currentLocation.lng
 
       // Upload images
       const beforeUrl = await uploadImage(beforeImage)
@@ -177,12 +186,13 @@ export default function BeachCleanup({ user, onUpdate }) {
           user_id: user.id,
           type: 'cleanup',
           status: 'verified',
-          gps_lat: position.coords.latitude,
-          gps_lng: position.coords.longitude,
+          beach_id: selectedBeach.beach_id,
+          gps_lat: userLat,
+          gps_lng: userLng,
           image_before_url: beforeUrl,
           image_after_url: afterUrl,
           coins_awarded: 50,
-          description: `Live location verified - Accuracy: ${position.coords.accuracy}m, Speed: ${position.coords.speed || 0}m/s`
+          description: `Beach cleanup at ${selectedBeach.name} - Real-time GPS verified (Accuracy: ${Math.round(verification.accuracy)}m, Distance: ${Math.round(verification.distance)}m)`
         })
 
       if (reportError) throw reportError

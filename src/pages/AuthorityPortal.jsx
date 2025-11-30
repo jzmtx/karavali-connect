@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import Navigation from '../components/Navigation'
+import LocationSearch from '../components/LocationSearch'
+import BeachSelector from '../components/BeachSelector'
 
 export default function AuthorityPortal({ user }) {
   const [activeTab, setActiveTab] = useState('reports')
@@ -17,6 +19,7 @@ export default function AuthorityPortal({ user }) {
   const [showBinForm, setShowBinForm] = useState(false)
   const [newUser, setNewUser] = useState({ phone_number: '', role: 'beach_authority', password: '' })
   const [newBin, setNewBin] = useState({ bin_id: '', gps_lat: '', gps_lng: '', location_name: '' })
+  const [selectedBeach, setSelectedBeach] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -57,16 +60,28 @@ export default function AuthorityPortal({ user }) {
 
   const loadPaymentRequests = async () => {
     if (!user) return
-    const { data } = await supabase
-      .from('payment_requests')
-      .select(`
-        *,
-        users!payment_requests_merchant_id_fkey(phone_number)
-      `)
-      .order('created_at', { ascending: false })
+    
+    if (user.role === 'beach_authority') {
+      const { data } = await supabase
+        .rpc('get_beach_payment_requests', {
+          authority_id: user.id
+        })
+      
+      if (data) {
+        setPaymentRequests(data)
+      }
+    } else {
+      const { data } = await supabase
+        .from('payment_requests')
+        .select(`
+          *,
+          users!payment_requests_merchant_id_fkey(phone_number)
+        `)
+        .order('created_at', { ascending: false })
 
-    if (data) {
-      setPaymentRequests(data)
+      if (data) {
+        setPaymentRequests(data)
+      }
     }
   }
 
@@ -94,6 +109,37 @@ export default function AuthorityPortal({ user }) {
 
       setMessage(`Report ${status} successfully`)
       loadReports()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleBeachAssignment = async (beach) => {
+    if (user.assigned_beach_id) {
+      setError('You already have a beach assigned')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const { data, error } = await supabase
+        .rpc('assign_beach_to_authority', {
+          authority_id: user.id,
+          beach_id_param: beach.beach_id
+        })
+
+      if (error) throw error
+
+      if (!data.success) {
+        throw new Error(data.error)
+      }
+
+      setMessage(`✅ Beach assigned successfully: ${data.beach_name}`)
+      // Update user object
+      user.assigned_beach_id = beach.beach_id
+      setSelectedBeach(beach)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -198,33 +244,68 @@ export default function AuthorityPortal({ user }) {
   }
 
   const loadBins = async () => {
-    const { data } = await supabase
-      .from('bins')
-      .select('*')
-      .order('created_at', { ascending: false })
+    if (user?.role === 'municipality') {
+      const { data } = await supabase
+        .rpc('get_municipality_bins', {
+          municipality_id: user.id
+        })
+      
+      if (data) setBins(data)
+    } else {
+      const { data } = await supabase
+        .from('bins')
+        .select('*')
+        .order('created_at', { ascending: false })
 
-    if (data) setBins(data)
-  }
-
-  const loadSafetyReports = async () => {
-    const { data } = await supabase
-      .from('reports')
-      .select(`*, users!reports_user_id_fkey(phone_number)`)
-      .in('type', ['danger', 'net'])
-      .order('created_at', { ascending: false })
-
-    if (data) setSafetyReports(data)
+      if (data) setBins(data)
+    }
   }
 
   const loadBinReports = async () => {
-    const { data } = await supabase
-      .from('reports')
-      .select(`*, users!reports_user_id_fkey(phone_number)`)
-      .eq('type', 'bin')
-      .order('created_at', { ascending: false })
+    if (user?.role === 'municipality') {
+      const { data } = await supabase
+        .rpc('get_beach_authority_reports', {
+          authority_id: user.id
+        })
+      
+      if (data) {
+        const binData = data.filter(report => report.type === 'bin')
+        setReports(binData)
+      }
+    } else {
+      const { data } = await supabase
+        .from('reports')
+        .select(`*, users!reports_user_id_fkey(phone_number)`)
+        .eq('type', 'bin')
+        .order('created_at', { ascending: false })
 
-    if (data) setReports(data)
+      if (data) setReports(data)
+    }
   }
+
+  const loadSafetyReports = async () => {
+    if (user?.role === 'beach_authority') {
+      const { data } = await supabase
+        .rpc('get_beach_authority_reports', {
+          authority_id: user.id
+        })
+      
+      if (data) {
+        const safetyData = data.filter(report => ['danger', 'net'].includes(report.type))
+        setSafetyReports(safetyData)
+      }
+    } else {
+      const { data } = await supabase
+        .from('reports')
+        .select(`*, users!reports_user_id_fkey(phone_number)`)
+        .in('type', ['danger', 'net'])
+        .order('created_at', { ascending: false })
+
+      if (data) setSafetyReports(data)
+    }
+  }
+
+
 
   const loadGhostNetReports = async () => {
     const { data } = await supabase
@@ -338,12 +419,14 @@ export default function AuthorityPortal({ user }) {
         ]
       case 'beach_authority':
         return [
+          { id: 'beach', label: '🏖️ Beach Selection', icon: '🏖️' },
           { id: 'payments', label: '💳 Payments', icon: '💳' },
           { id: 'safety', label: '⚠️ Safety & Ghost Nets', icon: '⚠️' },
           { id: 'analytics', label: '📊 Analytics', icon: '📊' }
         ]
       case 'municipality':
         return [
+          { id: 'beach', label: '🏖️ Beach Selection', icon: '🏖️' },
           { id: 'bins', label: '🗑️ Bin Management', icon: '🗑️' },
           { id: 'bin-reports', label: '📋 Bin Reports', icon: '📋' },
           { id: 'analytics', label: '📊 Analytics', icon: '📊' }
@@ -396,6 +479,46 @@ export default function AuthorityPortal({ user }) {
         )}
 
         <div className="glass-card">
+          {activeTab === 'beach' && (user?.role === 'beach_authority' || user?.role === 'municipality') && (
+            <div>
+              <h2>🏖️ {user?.role === 'municipality' ? 'Municipality' : 'Beach Authority'} Assignment</h2>
+              {user.assigned_beach_id ? (
+                <div style={{
+                  padding: '1.5rem',
+                  background: 'rgba(34, 197, 94, 0.2)',
+                  border: '1px solid rgba(34, 197, 94, 0.3)',
+                  borderRadius: '12px',
+                  textAlign: 'center'
+                }}>
+                  <h3 style={{ color: 'rgb(134, 239, 172)', margin: 0, marginBottom: '0.5rem' }}>
+                    ✅ Assigned Beach: {user.assigned_beach_id.replace(/_/g, ' ')}
+                  </h3>
+                  <p style={{ color: 'rgba(134, 239, 172, 0.8)', fontSize: '0.875rem', margin: 0 }}>
+                    Your beach assignment is permanent. You will receive all reports and manage payments for this beach.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <div style={{
+                    padding: '1rem',
+                    background: 'rgba(255, 193, 7, 0.15)',
+                    border: '1px solid rgba(255, 193, 7, 0.3)',
+                    borderRadius: '8px',
+                    marginBottom: '1rem'
+                  }}>
+                    <p style={{ color: 'rgb(254, 240, 138)', margin: 0, fontSize: '0.875rem' }}>
+                      ⚠️ <strong>One-time Assignment:</strong> Once you select a beach, it becomes your permanent assignment.
+                    </p>
+                  </div>
+                  <BeachSelector 
+                    user={user} 
+                    onBeachSelect={handleBeachAssignment} 
+                    selectedBeach={selectedBeach}
+                  />
+                </div>
+              )}
+            </div>
+          )}
           {activeTab === 'users' && user?.role === 'admin' && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -764,10 +887,70 @@ export default function AuthorityPortal({ user }) {
               {showBinForm && (
                 <div style={{ background: 'var(--glass-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--glass-border)', marginBottom: '1.5rem' }}>
                   <h3 style={{ marginBottom: '1rem' }}>Create New Bin</h3>
-                  <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-                    <input type="text" value={newBin.bin_id} onChange={(e) => setNewBin({...newBin, bin_id: e.target.value})} placeholder="Bin ID (e.g., BIN001)" className="form-input" />
-                    <input type="number" step="0.000001" value={newBin.gps_lat} onChange={(e) => setNewBin({...newBin, gps_lat: e.target.value})} placeholder="Latitude" className="form-input" />
-                    <input type="number" step="0.000001" value={newBin.gps_lng} onChange={(e) => setNewBin({...newBin, gps_lng: e.target.value})} placeholder="Longitude" className="form-input" />
+                  <div style={{ display: 'grid', gap: '1rem' }}>
+                    <input 
+                      type="text" 
+                      value={newBin.bin_id} 
+                      onChange={(e) => setNewBin({...newBin, bin_id: e.target.value})} 
+                      placeholder="Bin ID (e.g., BIN001)" 
+                      className="form-input" 
+                    />
+                    
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', color: 'white', fontSize: '0.875rem' }}>
+                        🔍 Search Bin Location
+                      </label>
+                      <LocationSearch
+                        placeholder="Search bin location..."
+                        onLocationSelect={(location) => {
+                          setNewBin({
+                            ...newBin,
+                            gps_lat: location.lat.toString(),
+                            gps_lng: location.lng.toString(),
+                            location_name: location.name
+                          })
+                          setMessage(`📍 Location set: ${location.name}`)
+                        }}
+                      />
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.2)' }}></div>
+                      <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem' }}>OR ENTER MANUALLY</span>
+                      <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.2)' }}></div>
+                    </div>
+                    
+                    <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: '1fr 1fr' }}>
+                      <input 
+                        type="number" 
+                        step="0.000001" 
+                        value={newBin.gps_lat} 
+                        onChange={(e) => setNewBin({...newBin, gps_lat: e.target.value})} 
+                        placeholder="Latitude" 
+                        className="form-input" 
+                      />
+                      <input 
+                        type="number" 
+                        step="0.000001" 
+                        value={newBin.gps_lng} 
+                        onChange={(e) => setNewBin({...newBin, gps_lng: e.target.value})} 
+                        placeholder="Longitude" 
+                        className="form-input" 
+                      />
+                    </div>
+                    
+                    {newBin.location_name && (
+                      <div style={{
+                        padding: '0.5rem',
+                        background: 'rgba(34, 197, 94, 0.2)',
+                        border: '1px solid rgba(34, 197, 94, 0.3)',
+                        borderRadius: '6px',
+                        color: 'rgb(134, 239, 172)',
+                        fontSize: '0.875rem'
+                      }}>
+                        📍 Selected: {newBin.location_name}
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
                     <button onClick={createBin} disabled={loading} className="btn btn-primary">Create Bin</button>
