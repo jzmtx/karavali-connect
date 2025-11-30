@@ -304,9 +304,18 @@ export default function MerchantPortal({ user }) {
     return ['register', 'scan'].includes(tabId)
   }
 
+  const tabs = [
+    { id: 'register', label: '🏖️ Beach Registration', icon: '🏖️' },
+    { id: 'scan', label: '📷 Scan Customer QR', icon: '📷' },
+    { id: 'payments', label: '💳 Payment Requests', icon: '💳' },
+    { id: 'profile', label: '👤 Profile Settings', icon: '👤' }
+  ]
+
   const handleTabChange = (tabId) => {
-    // Merchants have permanent location access
     setActiveTab(tabId)
+    const params = new URLSearchParams()
+    params.set('tab', tabId)
+    navigate(`/merchant?${params.toString()}`, { replace: true })
   }
 
   const handleLogout = () => {
@@ -317,46 +326,22 @@ export default function MerchantPortal({ user }) {
   }
 
   return (
-    <div style={{ minHeight: '100vh' }}>
-      <Navigation user={user} currentPage="merchant" />
+    <div className="app-layout">
+      <Navigation 
+        user={user} 
+        currentPage="merchant" 
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+      />
 
 
 
-      {/* Tabs */}
-      <div className="tab-nav container">
-        <button
-          onClick={() => handleTabChange('register')}
-          className={`tab-btn ${activeTab === 'register' ? 'active' : ''}`}
-        >
-          🏖️ Beach Registration
-        </button>
-        <button
-          onClick={() => handleTabChange('scan')}
-          className={`tab-btn ${activeTab === 'scan' ? 'active' : ''} ${
-            !isRegistered ? 'opacity-50' : ''
-          }`}
-          disabled={!isRegistered}
-          title={!isRegistered ? 'Requires beach registration' : ''}
-        >
-          📷 Scan QR
-        </button>
-        <button
-          onClick={() => setActiveTab('payments')}
-          className={`tab-btn ${activeTab === 'payments' ? 'active' : ''}`}
-          disabled={!isRegistered}
-          style={{ opacity: isRegistered ? 1 : 0.5 }}
-        >
-          💰 Payment Requests
-        </button>
-        <button
-          onClick={() => setActiveTab('profile')}
-          className={`tab-btn ${activeTab === 'profile' ? 'active' : ''}`}
-        >
-          👤 Profile
-        </button>
-      </div>
-
-      <main className="container main-content">
+      <main className="main-content">
+        <div className="container">
+          <div className="page-header">
+            <h1>Welcome to Merchant Dashboard</h1>
+          </div>
         {error && (
           <div className="alert alert-error">
             {error}
@@ -626,6 +611,7 @@ export default function MerchantPortal({ user }) {
             </div>
           </div>
         )}
+        </div>
       </main>
 
       {/* Location Update Prompt */}
