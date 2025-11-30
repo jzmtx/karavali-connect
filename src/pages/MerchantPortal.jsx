@@ -34,14 +34,9 @@ export default function MerchantPortal({ user }) {
   }, [user])
 
   useEffect(() => {
-    // Update location timer every minute
+    // Merchants have permanent location access
     const interval = setInterval(() => {
-      setLocationTimeRemaining(locationService.formatTimeRemaining())
-      
-      // Check if location needs update
-      if (locationService.needsLocationUpdate()) {
-        setLocationStatus({ valid: false, needsUpdate: true })
-      }
+      // No location updates needed for merchants
     }, 60000)
 
     return () => clearInterval(interval)
@@ -51,10 +46,11 @@ export default function MerchantPortal({ user }) {
     if (!user) return
     
     try {
-      const result = await locationService.initializeForUser(user.id)
+      const result = await locationService.initializeForUser(user.id, user.role)
       setLocationStatus({
         valid: result.success,
-        needsUpdate: result.needsUpdate
+        needsUpdate: result.needsUpdate,
+        isPermanent: result.isPermanent
       })
       
       if (result.success) {
@@ -304,10 +300,7 @@ export default function MerchantPortal({ user }) {
   }
 
   const handleTabChange = (tabId) => {
-    if (requiresLocation(tabId) && !locationStatus.valid) {
-      setShowLocationPrompt(true)
-      return
-    }
+    // Merchants have permanent location access
     setActiveTab(tabId)
   }
 
@@ -322,49 +315,32 @@ export default function MerchantPortal({ user }) {
     <div style={{ minHeight: '100vh' }}>
       <Navigation user={user} currentPage="merchant" />
 
-      {/* Location Status Bar */}
-      {locationStatus.valid && locationTimeRemaining && (
-        <div className="container" style={{ marginTop: '1rem' }}>
-          <div className="bg-green-500/20 border border-green-500/30 rounded-lg p-3 text-center">
-            <p className="text-green-300 text-sm">
-              📍 Location valid - {locationTimeRemaining}
-            </p>
-          </div>
+      {/* Location Status Bar - Merchants have permanent access */}
+      <div className="container" style={{ marginTop: '1rem' }}>
+        <div className="bg-green-500/20 border border-green-500/30 rounded-lg p-3 text-center">
+          <p className="text-green-300 text-sm">
+            📍 Merchant Access - No location expiry
+          </p>
         </div>
-      )}
-
-      {!locationStatus.valid && (
-        <div className="container" style={{ marginTop: '1rem' }}>
-          <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-3 text-center">
-            <p className="text-yellow-300 text-sm">
-              ⚠️ Location expired - Update location to access registration and scanning
-            </p>
-          </div>
-        </div>
-      )}
+      </div>
 
       {/* Tabs */}
       <div className="tab-nav container">
         <button
           onClick={() => handleTabChange('register')}
-          className={`tab-btn ${activeTab === 'register' ? 'active' : ''} ${
-            !locationStatus.valid ? 'opacity-50' : ''
-          }`}
-          title={!locationStatus.valid ? 'Requires location update' : ''}
+          className={`tab-btn ${activeTab === 'register' ? 'active' : ''}`}
         >
           🏖️ Beach Registration
-          {!locationStatus.valid && <span className="ml-1 text-yellow-400">⚠️</span>}
         </button>
         <button
           onClick={() => handleTabChange('scan')}
           className={`tab-btn ${activeTab === 'scan' ? 'active' : ''} ${
-            (!isRegistered || !locationStatus.valid) ? 'opacity-50' : ''
+            !isRegistered ? 'opacity-50' : ''
           }`}
           disabled={!isRegistered}
-          title={!isRegistered ? 'Requires beach registration' : !locationStatus.valid ? 'Requires location update' : ''}
+          title={!isRegistered ? 'Requires beach registration' : ''}
         >
           📷 Scan QR
-          {!locationStatus.valid && <span className="ml-1 text-yellow-400">⚠️</span>}
         </button>
         <button
           onClick={() => setActiveTab('payments')}
@@ -638,19 +614,10 @@ export default function MerchantPortal({ user }) {
               
               <div style={{ marginBottom: '1rem' }}>
                 <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.875rem' }}>Location Status</label>
-                <div style={{ color: locationStatus.valid ? '#10b981' : '#f59e0b', fontSize: '1.1rem', fontWeight: '500' }}>
-                  {locationStatus.valid ? `✅ Valid (${locationTimeRemaining})` : '⚠️ Expired - Update Required'}
+                <div style={{ color: '#10b981', fontSize: '1.1rem', fontWeight: '500' }}>
+                  ✅ Permanent Access (Merchant)
                 </div>
               </div>
-              
-              {!locationStatus.valid && (
-                <button
-                  onClick={() => setShowLocationPrompt(true)}
-                  className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-200 mt-4"
-                >
-                  📍 Update Location
-                </button>
-              )}
               
               <button
                 onClick={handleLogout}

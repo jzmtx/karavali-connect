@@ -83,7 +83,12 @@ class LocationService {
   }
 
   // Check if location needs update (expired or close to expiry)
-  needsLocationUpdate() {
+  needsLocationUpdate(userRole = 'tourist') {
+    // Merchants and authorities never need location updates
+    if (['merchant', 'beach_authority', 'municipality', 'fisheries_department', 'admin'].includes(userRole)) {
+      return false;
+    }
+    
     if (!this.locationExpiry) return true;
     
     const now = new Date();
@@ -120,8 +125,19 @@ class LocationService {
   }
 
   // Initialize location service for a user
-  async initializeForUser(userId) {
+  async initializeForUser(userId, userRole = 'tourist') {
     try {
+      // Merchants and authorities always have valid location
+      if (['merchant', 'beach_authority', 'municipality', 'fisheries_department', 'admin'].includes(userRole)) {
+        return {
+          success: true,
+          needsUpdate: false,
+          location: null,
+          timeRemaining: 'Permanent access',
+          isPermanent: true
+        };
+      }
+      
       const validity = await this.checkLocationValidity(userId);
       
       if (validity.valid) {

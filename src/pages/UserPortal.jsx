@@ -30,13 +30,15 @@ export default function UserPortal({ user }) {
   }, [user])
 
   useEffect(() => {
-    // Update location timer every minute
+    // Update location timer every minute (only for tourists)
     const interval = setInterval(() => {
-      setLocationTimeRemaining(locationService.formatTimeRemaining())
-      
-      // Check if location needs update
-      if (locationService.needsLocationUpdate()) {
-        setLocationStatus({ valid: false, needsUpdate: true })
+      if (user && user.role === 'tourist') {
+        setLocationTimeRemaining(locationService.formatTimeRemaining())
+        
+        // Check if location needs update
+        if (locationService.needsLocationUpdate(user.role)) {
+          setLocationStatus({ valid: false, needsUpdate: true })
+        }
       }
     }, 60000)
 
@@ -53,10 +55,11 @@ export default function UserPortal({ user }) {
     if (!user) return
     
     try {
-      const result = await locationService.initializeForUser(user.id)
+      const result = await locationService.initializeForUser(user.id, user.role)
       setLocationStatus({
         valid: result.success,
-        needsUpdate: result.needsUpdate
+        needsUpdate: result.needsUpdate,
+        isPermanent: result.isPermanent
       })
       
       if (result.success) {
@@ -118,7 +121,8 @@ export default function UserPortal({ user }) {
   }
 
   const handleTabChange = (tabId) => {
-    if (requiresLocation(tabId) && !locationStatus.valid) {
+    // Only tourists need location verification
+    if (user.role === 'tourist' && requiresLocation(tabId) && !locationStatus.valid) {
       setShowLocationPrompt(true)
       return
     }
@@ -147,8 +151,8 @@ export default function UserPortal({ user }) {
     <div style={{ minHeight: '100vh' }}>
       <Navigation user={{...user, coin_balance: coinBalance}} currentPage="user" />
 
-      {/* Location Status Bar */}
-      {locationStatus.valid && locationTimeRemaining && (
+      {/* Location Status Bar - Only for tourists */}
+      {user.role === 'tourist' && locationStatus.valid && locationTimeRemaining && (
         <div className="container" style={{ marginTop: '1rem' }}>
           <div className="bg-green-500/20 border border-green-500/30 rounded-lg p-3 text-center">
             <p className="text-green-300 text-sm">
@@ -158,7 +162,7 @@ export default function UserPortal({ user }) {
         </div>
       )}
 
-      {!locationStatus.valid && (
+      {user.role === 'tourist' && !locationStatus.valid && (
         <div className="container" style={{ marginTop: '1rem' }}>
           <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-3 text-center">
             <p className="text-yellow-300 text-sm">
@@ -175,12 +179,12 @@ export default function UserPortal({ user }) {
             key={tab.id}
             onClick={() => handleTabChange(tab.id)}
             className={`tab-btn ${activeTab === tab.id ? 'active' : ''} ${
-              tab.requiresLocation && !locationStatus.valid ? 'opacity-50' : ''
+              user.role === 'tourist' && tab.requiresLocation && !locationStatus.valid ? 'opacity-50' : ''
             }`}
-            title={tab.requiresLocation && !locationStatus.valid ? 'Requires location update' : ''}
+            title={user.role === 'tourist' && tab.requiresLocation && !locationStatus.valid ? 'Requires location update' : ''}
           >
             {tab.label}
-            {tab.requiresLocation && !locationStatus.valid && (
+            {user.role === 'tourist' && tab.requiresLocation && !locationStatus.valid && (
               <span className="ml-1 text-yellow-400">⚠️</span>
             )}
           </button>
@@ -299,12 +303,13 @@ export default function UserPortal({ user }) {
                   
                   <div style={{ marginBottom: '1rem' }}>
                     <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.875rem' }}>Location Status</label>
-                    <div style={{ color: locationStatus.valid ? '#10b981' : '#f59e0b', fontSize: '1.1rem', fontWeight: '500' }}>
-                      {locationStatus.valid ? `✅ Valid (${locationTimeRemaining})` : '⚠️ Expired - Update Required'}
+                    <div style={{ color: locationStatus.isPermanent || locationStatus.valid ? '#10b981' : '#f59e0b', fontSize: '1.1rem', fontWeight: '500' }}>
+                      {locationStatus.isPermanent ? '✅ Permanent Access' : 
+                       locationStatus.valid ? `✅ Valid (${locationTimeRemaining})` : '⚠️ Expired - Update Required'}
                     </div>
                   </div>
                   
-                  {!locationStatus.valid && (
+                  {user.role === 'tourist' && !locationStatus.valid && (
                     <button
                       onClick={() => setShowLocationPrompt(true)}
                       className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-200 mt-4"
