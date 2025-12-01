@@ -29,32 +29,24 @@ export async function detectTrash(image) {
   }
 
   try {
-    // Lower threshold to catch more items (default is 0.5)
-    const predictions = await model.detect(image, 100, 0.3)
+    // Lower threshold even further to catch everything (0.2)
+    const predictions = await model.detect(image, 100, 0.2)
     
-    // Trash-related objects from COCO-SSD (expanded list)
-    const trashKeywords = [
-      // Food/Organic
-      'bottle', 'cup', 'bowl', 'fork', 'knife', 'spoon', 'banana', 'apple', 'sandwich', 'pizza', 'orange', 'broccoli', 'carrot', 'hot dog', 'donut', 'cake',
-      // Containers/Paper/Plastic
-      'wine glass', 'vase', 'book', 'suitcase', 'handbag', 'backpack', 'umbrella', 'scissors',
-      // Electronics (e-waste)
-      'cell phone', 'mouse', 'remote', 'keyboard', 'laptop', 'tv',
-      // Sports/Outdoors
-      'sports ball', 'frisbee', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket'
+    // Blocklist: Things that are definitely NOT trash
+    const nonTrashClasses = [
+      'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat',
+      'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe'
     ]
     
     const trashDetected = predictions.some(prediction => {
       const className = prediction.class.toLowerCase()
-      return trashKeywords.some(keyword => className.includes(keyword))
+      // Accept anything that is NOT in the blocklist
+      return !nonTrashClasses.includes(className)
     })
 
     return {
       trashDetected,
-      predictions: predictions.filter(p => {
-        const className = p.class.toLowerCase()
-        return trashKeywords.some(keyword => className.includes(keyword))
-      }),
+      predictions: predictions.filter(p => !nonTrashClasses.includes(p.class.toLowerCase())),
       confidence: trashDetected ? Math.max(...predictions.map(p => p.score)) : 0
     }
   } catch (error) {
