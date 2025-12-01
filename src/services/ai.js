@@ -29,8 +29,8 @@ export async function detectTrash(image) {
   }
 
   try {
-    // Lower threshold even further to catch everything (0.2)
-    const predictions = await model.detect(image, 100, 0.2)
+    // Lower threshold even further to catch everything (0.01 - 1%)
+    const predictions = await model.detect(image, 100, 0.01)
     
     // Blocklist: Things that are definitely NOT trash
     const nonTrashClasses = [

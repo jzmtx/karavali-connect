@@ -29,6 +29,15 @@ export default function BeachCleanup({ user, selectedBeach, onUpdate }) {
     setCameraMode('before')
     setShowCamera(true)
     setMessage('Take a photo of the area with trash')
+    setError('') // Clear any previous errors
+  }
+
+  const handleManualOverride = () => {
+    setError('')
+    setMessage('✅ Manual override accepted. Timer started - clean for at least 5 minutes.')
+    setStep('cleaning')
+    const now = Date.now()
+    setStartTime(now)
   }
 
   const handleBeforeCapture = async (file) => {
@@ -63,13 +72,7 @@ export default function BeachCleanup({ user, selectedBeach, onUpdate }) {
       if (!result.trashDetected) {
         setError('No trash detected in the image. Please take a photo of an area with visible trash.')
         setLoading(false)
-        // Clean up URL
-        if (beforeUrlRef.current) {
-          URL.revokeObjectURL(beforeUrlRef.current)
-          beforeUrlRef.current = null
-        }
-        setBeforeImageUrl(null)
-        setBeforeImage(null)
+        // Do NOT clear image state here, so user can override
         return
       }
 
@@ -293,7 +296,25 @@ export default function BeachCleanup({ user, selectedBeach, onUpdate }) {
           borderRadius: '8px',
           marginBottom: '1rem'
         }}>
-          {error}
+          <p style={{ marginBottom: error.includes('No trash detected') ? '0.5rem' : 0 }}>{error}</p>
+          {error.includes('No trash detected') && (
+            <button
+              onClick={handleManualOverride}
+              style={{
+                background: '#dc2626',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '4px',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                marginTop: '0.5rem'
+              }}
+            >
+              I confirm this is trash
+            </button>
+          )}
         </div>
       )}
 
