@@ -653,6 +653,23 @@ export default function AuthorityPortal({ user }) {
                         📅 {new Date(request.created_at).toLocaleString()}
                       </div>
 
+                      {request.upi_id && (
+                        <div className="mb-4">
+                          <div
+                            className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded px-3 py-2 cursor-pointer hover:bg-blue-500/20 transition-colors"
+                            onClick={() => {
+                              navigator.clipboard.writeText(request.upi_id)
+                              alert('UPI ID copied: ' + request.upi_id)
+                            }}
+                            title="Click to copy UPI ID"
+                          >
+                            <span className="text-blue-300 font-medium">UPI ID:</span>
+                            <strong className="text-white">{request.upi_id}</strong>
+                            <span className="text-blue-300 text-xs ml-1">📋 Copy</span>
+                          </div>
+                        </div>
+                      )}
+
                       {request.status === 'pending' && (
                         <div className="flex gap-2">
                           <Button
