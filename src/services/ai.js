@@ -23,14 +23,16 @@ export async function loadModel() {
  * @param {HTMLImageElement|HTMLCanvasElement|ImageData} image - Image to analyze
  * @returns {Promise<object>} Detection result
  */
-export async function detectTrash(image) {
+export async function detectTrash(image, options = {}) {
   if (!model) {
     await loadModel()
   }
 
   try {
     // Lower threshold even further to catch everything (0.01 - 1%)
-    const predictions = await model.detect(image, 100, 0.01)
+    // Allow overriding threshold
+    const threshold = (options && options.threshold) || 0.01
+    const predictions = await model.detect(image, 100, threshold)
     
     // Blocklist: Things that are definitely NOT trash
     const nonTrashClasses = [
@@ -66,7 +68,8 @@ export async function detectTrash(image) {
  * @returns {Promise<object>} Verification result
  */
 export async function verifyCleanup(image) {
-  const result = await detectTrash(image)
+  // Use a higher threshold for verification to avoid false positives (0.1)
+  const result = await detectTrash(image, { threshold: 0.1 })
   
   return {
     isClean: !result.trashDetected,

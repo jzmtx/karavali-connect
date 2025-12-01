@@ -147,15 +147,24 @@ export default function BeachCleanup({ user, selectedBeach, onUpdate }) {
       if (!result.isClean) {
         setError(`Cleanup incomplete. Still detected ${result.trashCount} trash items. Please clean more thoroughly.`)
         setLoading(false)
-        // Clean up URL
-        if (afterUrlRef.current) {
-          URL.revokeObjectURL(afterUrlRef.current)
-          afterUrlRef.current = null
-        }
-        setAfterImageUrl(null)
-        setAfterImage(null)
         return
       }
+
+      await completeCleanup(file)
+
+    } catch (err) {
+      setError(err.message || 'Failed to verify cleanup')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const completeCleanup = async (currentAfterImage = null) => {
+    setLoading(true)
+    setError('')
+
+    try {
+      const imageToUpload = currentAfterImage || afterImage
 
       // Verify real-time GPS location for activity
       const verification = await activityVerificationService.verifyActivityLocation(
@@ -180,7 +189,7 @@ export default function BeachCleanup({ user, selectedBeach, onUpdate }) {
 
       // Upload images
       const beforeUrl = await uploadImage(beforeImage)
-      const afterUrl = await uploadImage(afterImage)
+      const afterUrl = await uploadImage(imageToUpload)
 
       // Create report with live location tracking
       const { error: reportError } = await supabase
@@ -221,10 +230,14 @@ export default function BeachCleanup({ user, selectedBeach, onUpdate }) {
       onUpdate()
 
     } catch (err) {
-      setError(err.message || 'Failed to verify cleanup')
+      setError(err.message || 'Failed to complete cleanup')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleVerificationOverride = () => {
+    completeCleanup()
   }
 
   // Cleanup on unmount
@@ -313,6 +326,24 @@ export default function BeachCleanup({ user, selectedBeach, onUpdate }) {
               }}
             >
               I confirm this is trash
+            </button>
+          )}
+          {error.includes('Cleanup incomplete') && (
+            <button
+              onClick={handleVerificationOverride}
+              style={{
+                background: '#dc2626',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '4px',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                marginTop: '0.5rem'
+              }}
+            >
+              I confirm area is clean
             </button>
           )}
         </div>
