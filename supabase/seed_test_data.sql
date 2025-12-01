@@ -1,5 +1,5 @@
 -- Seed Test Data for User Testing
--- Location: 12.898705, 74.984711
+-- Location: 12.900792, 74.987995
 
 -- 1. Insert Test Beach
 INSERT INTO beaches (beach_id, name, district, gps_lat, gps_lng, status)
@@ -7,12 +7,13 @@ VALUES (
   'test_beach_location',
   'Test Beach Location',
   'Test District',
-  12.898705,
-  74.984711,
+  12.900792,
+  74.987995,
   'active'
 ) ON CONFLICT (beach_id) DO NOTHING;
 
 -- 2. Insert Test Users
+
 -- Merchant
 INSERT INTO users (phone_number, password_hash, role, coin_balance, pending_coins, created_at)
 VALUES (
@@ -48,14 +49,51 @@ VALUES (
   NOW()
 ) ON CONFLICT (phone_number) DO NOTHING;
 
+-- Tourist (Regular User)
+INSERT INTO users (phone_number, password_hash, role, coin_balance, pending_coins, created_at)
+VALUES (
+  '9999999904',
+  'password',
+  'tourist',
+  100,
+  0,
+  NOW()
+) ON CONFLICT (phone_number) DO NOTHING;
+
 -- 3. Insert Test Bin
 INSERT INTO bins (bin_id, qr_code, gps_lat, gps_lng, status, beach_id, created_at)
 VALUES (
   'BIN-TEST-001',
   'karavali-bin-test-001',
-  12.898705,
-  74.984711,
+  12.900792,
+  74.987995,
   'empty',
   'test_beach_location',
   NOW()
 ) ON CONFLICT (bin_id) DO NOTHING;
+
+-- 4. Link Merchant to Beach (Required for merchant features)
+INSERT INTO beach_merchants (
+  merchant_id,
+  beach_id,
+  business_name,
+  business_type,
+  shop_address,
+  shop_gps_lat,
+  shop_gps_lng,
+  contact_phone,
+  is_active
+)
+SELECT 
+  id, 
+  'test_beach_location',
+  'Test Merchant Shop',
+  'Cafe',
+  '123 Beach Road',
+  12.900792,
+  74.987995,
+  '9999999901',
+  true
+FROM users 
+WHERE phone_number = '9999999901'
+ON CONFLICT (merchant_id, beach_id) DO NOTHING;
