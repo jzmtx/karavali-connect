@@ -37,7 +37,6 @@ cp .env.example .env
 **Required Services:**
 - **Supabase**: Create project at https://supabase.com
 - **Mapbox**: Get token from https://account.mapbox.com/access-tokens/
-- **Telegram Bot**: Create via @BotFather on Telegram
 - **Cloudinary**: Sign up at https://cloudinary.com
 
 ### 3. Set Up Supabase Database
