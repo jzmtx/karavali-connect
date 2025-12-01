@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 
-export default function QRScanner({ onScan }) {
+export default function QRScanner({ onScan, scannerId = "qr-reader" }) {
   const [scanning, setScanning] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -19,14 +19,13 @@ export default function QRScanner({ onScan }) {
       await new Promise(resolve => setTimeout(resolve, 200))
 
       // Check if element exists
-      const elementId = "qr-reader"
-      const element = document.getElementById(elementId)
+      const element = document.getElementById(scannerId)
       if (!element) {
         throw new Error('Scanner container not found')
       }
 
       // Create scanner instance
-      const html5QrCode = new Html5Qrcode(elementId)
+      const html5QrCode = new Html5Qrcode(scannerId)
       html5QrCodeRef.current = html5QrCode
 
       // Start scanning with better error handling
@@ -34,16 +33,23 @@ export default function QRScanner({ onScan }) {
         await html5QrCode.start(
           { facingMode: "environment" }, // Use back camera
           {
-            fps: 10,
-            qrbox: function(viewfinderWidth, viewfinderHeight) {
-              // Make QR box responsive
-              let minEdgePercentage = 0.7;
+          {
+            fps: 15, // Increased FPS for smoother scanning
+            qrbox: function (viewfinderWidth, viewfinderHeight) {
+              // Larger scan area (85%)
+              let minEdgePercentage = 0.85;
               let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
               let qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
               return {
                 width: qrboxSize,
                 height: qrboxSize
               };
+            },
+            videoConstraints: {
+              width: { min: 640, ideal: 1280, max: 1920 },
+              height: { min: 480, ideal: 720, max: 1080 },
+              facingMode: "environment",
+              focusMode: "continuous" // Try to force continuous focus
             }
           },
           (decodedText) => {
@@ -53,8 +59,8 @@ export default function QRScanner({ onScan }) {
           (errorMessage) => {
             // Ignore scanning errors (they're normal while scanning)
             // Only log actual errors, not "NotFoundException" which is normal
-            if (!errorMessage.includes('NotFoundException') && 
-                !errorMessage.includes('No MultiFormat Readers')) {
+            if (!errorMessage.includes('NotFoundException') &&
+              !errorMessage.includes('No MultiFormat Readers')) {
               // Silent - these are normal during scanning
             }
           }
@@ -65,9 +71,10 @@ export default function QRScanner({ onScan }) {
         await html5QrCode.start(
           undefined, // Use default camera
           {
-            fps: 10,
-            qrbox: function(viewfinderWidth, viewfinderHeight) {
-              let minEdgePercentage = 0.7;
+          {
+            fps: 15,
+            qrbox: function (viewfinderWidth, viewfinderHeight) {
+              let minEdgePercentage = 0.85;
               let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
               let qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
               return {
@@ -79,7 +86,7 @@ export default function QRScanner({ onScan }) {
           (decodedText) => {
             handleScanSuccess(decodedText)
           },
-          () => {}
+          () => { }
         )
       }
       setLoading(false)
@@ -101,7 +108,7 @@ export default function QRScanner({ onScan }) {
       if (html5QrCodeRef.current) {
         try {
           await html5QrCodeRef.current.stop()
-        } catch (e) {}
+        } catch (e) { }
         html5QrCodeRef.current = null
       }
     }
@@ -136,7 +143,7 @@ export default function QRScanner({ onScan }) {
   useEffect(() => {
     return () => {
       if (html5QrCodeRef.current) {
-        html5QrCodeRef.current.stop().catch(() => {})
+        html5QrCodeRef.current.stop().catch(() => { })
       }
     }
   }, [])
@@ -189,9 +196,9 @@ export default function QRScanner({ onScan }) {
             padding: '1rem',
             borderTop: '1px solid #e5e7eb'
           }}>
-            <p style={{ 
-              fontSize: '0.875rem', 
-              color: '#6b7280', 
+            <p style={{
+              fontSize: '0.875rem',
+              color: '#6b7280',
               marginBottom: '0.5rem',
               textAlign: 'center'
             }}>
@@ -252,14 +259,14 @@ export default function QRScanner({ onScan }) {
               <p style={{ color: '#6b7280' }}>Starting camera...</p>
             </div>
           )}
-          
-          <div id="qr-reader" style={{
+
+          <div id={scannerId} style={{
             width: '100%',
             maxWidth: '500px',
             margin: '0 auto',
-            display: loading ? 'none' : 'block'
+            minHeight: '300px'
           }}></div>
-          
+
           {error && (
             <div style={{
               background: '#fee2e2',
@@ -305,7 +312,7 @@ export default function QRScanner({ onScan }) {
           )}
         </div>
       )}
-      
+
       <style>{`
         @keyframes spin {
           0% { transform: rotate(0deg); }
