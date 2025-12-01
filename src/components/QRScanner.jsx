@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Html5Qrcode } from 'html5-qrcode'
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 
 export default function QRScanner({ onScan, scannerId = "qr-reader" }) {
   const [scanning, setScanning] = useState(false)
@@ -24,8 +24,13 @@ export default function QRScanner({ onScan, scannerId = "qr-reader" }) {
         throw new Error('Scanner container not found')
       }
 
-      // Create scanner instance
-      const html5QrCode = new Html5Qrcode(scannerId)
+      // Create scanner instance with optimized config
+      const html5QrCode = new Html5Qrcode(scannerId, {
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true
+        }
+      })
       html5QrCodeRef.current = html5QrCode
 
       // Start scanning with better error handling
