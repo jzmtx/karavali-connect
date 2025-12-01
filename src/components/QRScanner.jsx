@@ -33,7 +33,6 @@ export default function QRScanner({ onScan, scannerId = "qr-reader" }) {
         await html5QrCode.start(
           { facingMode: "environment" }, // Use back camera
           {
-          {
             fps: 15, // Increased FPS for smoother scanning
             qrbox: function (viewfinderWidth, viewfinderHeight) {
               // Larger scan area (85%)
@@ -70,7 +69,6 @@ export default function QRScanner({ onScan, scannerId = "qr-reader" }) {
         console.log('Back camera failed, trying default camera...')
         await html5QrCode.start(
           undefined, // Use default camera
-          {
           {
             fps: 15,
             qrbox: function (viewfinderWidth, viewfinderHeight) {
