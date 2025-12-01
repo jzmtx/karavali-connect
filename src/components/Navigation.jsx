@@ -91,18 +91,22 @@ export default function Navigation({ user, currentPage, tabs, activeTab, onTabCh
     // So we should map the static items to use `onTabChange` if available and if the item ID matches a passed tab.
 
     if (tabs && onTabChange) {
-      // Map over roleItems and replace action with onTabChange if it matches a tab
-      roleItems = roleItems.map(item => {
-        const matchingTab = tabs.find(t => t.id === item.id);
-        if (matchingTab) {
-          return {
-            ...item,
-            action: () => onTabChange(item.id),
-            isActive: activeTab === item.id
-          };
-        }
-        return item;
-      });
+      // If tabs are provided, use them as the source of truth for navigation
+      // This ensures the sidebar matches the portal's available tabs
+      const divider = roleItems.find(item => item.divider);
+
+      roleItems = tabs.map(tab => ({
+        id: tab.id,
+        label: tab.label,
+        icon: tab.icon,
+        action: () => onTabChange(tab.id),
+        isActive: activeTab === tab.id
+      }));
+
+      // Re-add the divider if it existed
+      if (divider) {
+        roleItems.unshift(divider);
+      }
     }
 
     return [
