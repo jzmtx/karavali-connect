@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useNavigate } from 'react-router-dom'
+import Card from '../components/ui/Card'
+import Button from '../components/ui/Button'
+import Input from '../components/ui/Input'
 
 export default function AdminPanel({ user }) {
   const [activeTab, setActiveTab] = useState('users')
@@ -143,302 +146,174 @@ export default function AdminPanel({ user }) {
 
   const getRoleBadgeColor = (role) => {
     const colors = {
-      tourist: '#1e40af',
-      merchant: '#10b981',
-      municipality: '#dc2626',
-      beach_authority: '#f59e0b',
-      forest_department: '#059669',
-      admin: '#7c3aed'
+      tourist: 'bg-blue-600',
+      merchant: 'bg-green-600',
+      municipality: 'bg-red-600',
+      beach_authority: 'bg-amber-600',
+      forest_department: 'bg-emerald-600',
+      admin: 'bg-purple-600'
     }
-    return colors[role] || '#6b7280'
+    return colors[role] || 'bg-gray-600'
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f3f4f6' }}>
-      <header style={{
-        background: 'linear-gradient(135deg, #000000 0%, #1a0000 50%, #8B0000 100%)',
-        color: 'white',
-        padding: '1rem',
-        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="min-h-screen bg-gradient-to-br from-black via-red-950 to-black pb-20">
+      <header className="bg-black/50 backdrop-blur-md border-b border-red-900/30 sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 style={{ fontSize: '1.5rem', margin: 0 }}>👑 Admin Panel</h1>
-            <p style={{ margin: 0, opacity: 0.9, fontSize: '0.875rem' }}>
+            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+              👑 Admin Panel
+            </h1>
+            <p className="text-sm text-gray-400">
               Manage users, merchants, and authorities
             </p>
           </div>
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={handleLogout}
-            style={{
-              background: 'rgba(255,255,255,0.2)',
-              border: '1px solid rgba(255,255,255,0.3)',
-              color: 'white',
-              padding: '0.5rem 1rem',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontWeight: '500',
-              fontSize: '0.875rem'
-            }}
+            icon="🚪"
           >
-            🚪 Logout
-          </button>
+            Logout
+          </Button>
         </div>
       </header>
 
-      {/* Tabs */}
-      <div style={{
-        display: 'flex',
-        gap: '0.5rem',
-        padding: '0 1rem',
-        maxWidth: '1200px',
-        margin: '0 auto',
-        marginTop: '1rem',
-        marginBottom: '1rem'
-      }}>
-        <button
-          onClick={() => setActiveTab('users')}
-          style={{
-            padding: '0.75rem 1.5rem',
-            background: activeTab === 'users' ? '#8B0000' : 'white',
-            color: activeTab === 'users' ? 'white' : '#374151',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontWeight: activeTab === 'users' ? '600' : '400'
-          }}
-        >
-          👥 Manage Users
-        </button>
-        <button
-          onClick={() => setActiveTab('create')}
-          style={{
-            padding: '0.75rem 1.5rem',
-            background: activeTab === 'create' ? '#8B0000' : 'white',
-            color: activeTab === 'create' ? 'white' : '#374151',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontWeight: activeTab === 'create' ? '600' : '400'
-          }}
-        >
-          ➕ Create User
-        </button>
-      </div>
+      <div className="container mx-auto px-4 py-6">
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`px-6 py-3 rounded-lg font-semibold transition-all duration-200 whitespace-nowrap ${activeTab === 'users'
+                ? 'bg-red-600 text-white shadow-lg shadow-red-900/50'
+                : 'bg-white/5 text-gray-300 hover:bg-white/10'
+              }`}
+          >
+            👥 Manage Users
+          </button>
+          <button
+            onClick={() => setActiveTab('create')}
+            className={`px-6 py-3 rounded-lg font-semibold transition-all duration-200 whitespace-nowrap ${activeTab === 'create'
+                ? 'bg-red-600 text-white shadow-lg shadow-red-900/50'
+                : 'bg-white/5 text-gray-300 hover:bg-white/10'
+              }`}
+          >
+            ➕ Create User
+          </button>
+        </div>
 
-      <main style={{ padding: '1rem', maxWidth: '1200px', margin: '0 auto' }}>
         {error && (
-          <div style={{
-            background: '#fee2e2',
-            color: '#dc2626',
-            padding: '0.75rem',
-            borderRadius: '8px',
-            marginBottom: '1rem'
-          }}>
+          <div className="alert alert-error mb-6">
             {error}
           </div>
         )}
 
         {message && (
-          <div style={{
-            background: '#d1fae5',
-            color: '#065f46',
-            padding: '0.75rem',
-            borderRadius: '8px',
-            marginBottom: '1rem'
-          }}>
+          <div className="alert alert-success mb-6">
             {message}
           </div>
         )}
 
         {activeTab === 'create' && (
-          <div style={{
-            background: 'white',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            marginBottom: '1rem'
-          }}>
-            <h2 style={{ marginBottom: '1rem' }}>Create New User</h2>
-
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
-                Name *
-              </label>
-              <input
-                type="text"
+          <Card className="max-w-2xl mx-auto">
+            <h2 className="text-xl font-bold text-white mb-6">Create New User</h2>
+            <div className="space-y-4">
+              <Input
+                label="Name *"
                 value={newUser.name}
                 onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
                 placeholder="User name"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  fontSize: '1rem'
-                }}
               />
-            </div>
-
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
-                Phone Number *
-              </label>
-              <input
+              <Input
+                label="Phone Number *"
                 type="tel"
                 value={newUser.phone}
                 onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
                 placeholder="+91 9876543210"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  fontSize: '1rem'
-                }}
               />
-            </div>
-
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
-                Email (Optional)
-              </label>
-              <input
+              <Input
+                label="Email (Optional)"
                 type="email"
                 value={newUser.email}
                 onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                 placeholder="user@example.com"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  fontSize: '1rem'
-                }}
               />
-            </div>
-
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
-                Role *
-              </label>
-              <select
-                value={newUser.role}
-                onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  fontSize: '1rem'
-                }}
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-2">Role *</label>
+                <select
+                  value={newUser.role}
+                  onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                  className="form-input w-full"
+                >
+                  <option value="tourist">Tourist/User</option>
+                  <option value="merchant">Merchant</option>
+                  <option value="municipality">Municipality</option>
+                  <option value="beach_authority">Beach Authority</option>
+                  <option value="forest_department">Forest Department</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              <Button
+                onClick={handleCreateUser}
+                isLoading={loading}
+                className="w-full mt-4"
               >
-                <option value="tourist">Tourist/User</option>
-                <option value="merchant">Merchant</option>
-                <option value="municipality">Municipality</option>
-                <option value="beach_authority">Beach Authority</option>
-                <option value="forest_department">Forest Department</option>
-                <option value="admin">Admin</option>
-              </select>
+                Create User
+              </Button>
             </div>
-
-            <button
-              onClick={handleCreateUser}
-              disabled={loading}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                background: loading ? '#9ca3af' : '#8B0000',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '1rem',
-                fontWeight: '600',
-                cursor: loading ? 'not-allowed' : 'pointer'
-              }}
-            >
-              {loading ? 'Creating...' : 'Create User'}
-            </button>
-          </div>
+          </Card>
         )}
 
         {activeTab === 'users' && (
-          <div style={{
-            background: 'white',
-            borderRadius: '12px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            overflow: 'hidden'
-          }}>
-            <div style={{ padding: '1rem', borderBottom: '1px solid #e5e7eb' }}>
-              <h2>All Users ({users.length})</h2>
+          <Card className="overflow-hidden p-0">
+            <div className="p-4 border-b border-white/10 bg-white/5">
+              <h2 className="text-lg font-bold text-white">All Users ({users.length})</h2>
             </div>
 
             {users.length === 0 ? (
-              <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+              <div className="p-8 text-center text-gray-400">
                 No users found
               </div>
             ) : (
-              <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
+              <div className="max-h-[600px] overflow-y-auto divide-y divide-white/10">
                 {users.map(u => (
-                  <div
-                    key={u.id}
-                    style={{
-                      padding: '1rem',
-                      borderBottom: '1px solid #e5e7eb',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}
-                  >
+                  <div key={u.id} className="p-4 hover:bg-white/5 transition-colors flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                      <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>
-                        {u.name || 'No name'} {u.phone_number}
+                      <div className="font-semibold text-white mb-1">
+                        {u.name || 'No name'} <span className="text-gray-400 text-sm ml-2">{u.phone_number}</span>
                       </div>
-                      <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                        {u.email || 'No email'} • Coins: {u.coin_balance || 0}
-                        {u.merchant_coins > 0 && ` • Merchant Coins: ${u.merchant_coins}`}
+                      <div className="text-sm text-gray-400">
+                        {u.email && <span>{u.email} • </span>}
+                        <span className="text-yellow-500">Coins: {u.coin_balance || 0}</span>
+                        {u.merchant_coins > 0 && <span className="text-green-400 ml-2">• Merchant: {u.merchant_coins}</span>}
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
-                        Created: {new Date(u.created_at).toLocaleString()}
+                      <div className="text-xs text-gray-500 mt-1">
+                        Created: {new Date(u.created_at).toLocaleDateString()}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                      <span style={{
-                        padding: '0.25rem 0.5rem',
-                        background: getRoleBadgeColor(u.role),
-                        color: 'white',
-                        borderRadius: '4px',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        textTransform: 'capitalize'
-                      }}>
+
+                    <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold text-white uppercase tracking-wider ${getRoleBadgeColor(u.role)}`}>
                         {u.role.replace('_', ' ')}
                       </span>
                       {u.role !== 'admin' && (
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleDeleteUser(u.id, u.name || u.phone_number)}
-                          style={{
-                            padding: '0.25rem 0.5rem',
-                            background: '#ef4444',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.75rem'
-                          }}
+                          className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
                         >
                           Delete
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </div>
                 ))}
               </div>
             )}
-          </div>
+          </Card>
         )}
-      </main>
+      </div>
     </div>
   )
 }
-

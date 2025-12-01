@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 export default function Navigation({ user, currentPage, tabs, activeTab, onTabChange }) {
@@ -15,10 +15,25 @@ export default function Navigation({ user, currentPage, tabs, activeTab, onTabCh
     const commonItems = [
       { id: 'home', label: 'Home', icon: '🏠', action: () => navigate('/') }
     ];
-    
-    if (currentPage === 'user') {
+
+    if (!user) {
       return [
         ...commonItems,
+        { id: 'login', label: 'Login', icon: '🔑', action: () => navigate('/login') },
+        { id: 'register', label: 'Register', icon: '📝', action: () => navigate('/register') }
+      ]
+    }
+
+    // Role-based navigation
+    const isMerchant = user.role === 'merchant';
+    const isAuthority = ['municipality', 'beach_authority', 'forest_department'].includes(user.role);
+    const isAdmin = user.role === 'admin';
+    const isUser = !isMerchant && !isAuthority && !isAdmin;
+
+    let roleItems = [];
+
+    if (isUser) {
+      roleItems = [
         { id: 'dashboard', label: 'Dashboard', icon: '📊', action: () => navigate('/dashboard') },
         { id: 'map', label: 'Interactive Map', icon: '🗺️', action: () => navigate('/user') },
         { id: 'activities', label: 'Activities', icon: '🏃', divider: true },
@@ -29,64 +44,71 @@ export default function Navigation({ user, currentPage, tabs, activeTab, onTabCh
         { id: 'services', label: 'Services', icon: '🛍️', divider: true },
         { id: 'merchants', label: 'Local Merchants', icon: '🏪', action: () => navigate('/user?tab=merchants') },
         { id: 'wallet', label: 'My Wallet', icon: '💰', action: () => navigate('/user?tab=wallet') },
-        { id: 'account', label: 'Account', icon: '⚙️', divider: true },
-        { id: 'profile', label: 'Profile Settings', icon: '👤', action: () => navigate('/user?tab=profile') },
-        { id: 'logout', label: 'Logout', icon: '🚪', action: handleLogout }
-      ]
-    } else if (currentPage === 'merchant') {
-      const merchantItems = [
-        ...commonItems,
-        { id: 'business', label: 'Business', icon: '🏢', divider: true }
-      ]
-      
-      // Add dynamic tabs from MerchantPortal
-      if (tabs) {
-        tabs.forEach(tab => {
-          merchantItems.push({
-            id: tab.id,
-            label: tab.label,
-            icon: tab.icon,
-            action: () => onTabChange(tab.id),
-            isActive: activeTab === tab.id
-          })
-        })
+      ];
+    } else if (isMerchant) {
+      roleItems = [
+        { id: 'business', label: 'Business', icon: '🏢', divider: true },
+        // Default Merchant Items (if tabs not provided)
+        { id: 'register', label: 'Beach Registration', icon: '🏖️', action: () => navigate('/merchant?tab=register') },
+        { id: 'scan', label: 'Scan Customer QR', icon: '📷', action: () => navigate('/merchant?tab=scan') },
+        { id: 'payments', label: 'Payment Requests', icon: '💳', action: () => navigate('/merchant?tab=payments') },
+      ];
+    } else if (isAuthority) {
+      roleItems = [
+        { id: 'management', label: 'Management', icon: '🏛️', divider: true },
+        // Default Authority Items
+        { id: 'reports', label: 'Reports', icon: '📋', action: () => navigate('/authority?tab=reports') },
+        { id: 'analytics', label: 'Analytics', icon: '📊', action: () => navigate('/authority?tab=analytics') },
+      ];
+
+      // Role specific additions
+      if (user.role === 'beach_authority' || user.role === 'municipality') {
+        roleItems.splice(1, 0, { id: 'beach', label: 'Beach Selection', icon: '🏖️', action: () => navigate('/authority?tab=beach') });
       }
-      
-      merchantItems.push(
-        { id: 'account', label: 'Account', icon: '⚙️', divider: true },
-        { id: 'logout', label: 'Logout', icon: '🚪', action: handleLogout }
-      )
-      
-      return merchantItems
-    } else if (currentPage === 'authority') {
-      const authorityItems = [
-        ...commonItems,
-        { id: 'management', label: 'Management', icon: '🏛️', divider: true }
-      ]
-      
-      // Add dynamic tabs from AuthorityPortal
-      if (tabs) {
-        tabs.forEach(tab => {
-          authorityItems.push({
-            id: tab.id,
-            label: tab.label,
-            icon: tab.icon,
-            action: () => onTabChange(tab.id),
-            isActive: activeTab === tab.id
-          })
-        })
+      if (user.role === 'municipality') {
+        roleItems.push({ id: 'bins', label: 'Bin Management', icon: '🗑️', action: () => navigate('/authority?tab=bins') });
       }
-      
-      authorityItems.push(
-        { id: 'account', label: 'Account', icon: '⚙️', divider: true },
-        { id: 'logout', label: 'Logout', icon: '🚪', action: handleLogout }
-      )
-      
-      return authorityItems
+    } else if (isAdmin) {
+      roleItems = [
+        { id: 'admin', label: 'Admin Panel', icon: '👑', divider: true },
+        { id: 'users', label: 'Users', icon: '👥', action: () => navigate('/admin?tab=users') },
+        { id: 'reports', label: 'All Reports', icon: '📋', action: () => navigate('/admin?tab=reports') },
+        { id: 'payments', label: 'Payments', icon: '💳', action: () => navigate('/admin?tab=payments') },
+      ];
     }
-    
+
+    // If tabs are explicitly provided (we are on the portal page), override the default role items
+    // Actually, we should probably merge them or just use the tabs if available for better state management?
+    // The issue is that 'tabs' prop usually comes with 'onTabChange' which is better than navigating.
+    // But for the sidebar, navigating is fine.
+    // Let's stick to the defaults for consistency across pages, unless we want to highlight the active tab.
+
+    // If we are on the specific portal page (currentPage matches role), we can use the passed tabs to highlight or ensure exact match.
+    // But for simplicity and to fix the "Home" issue, let's use the static list we just built, 
+    // and maybe map the 'activeTab' to highlight the correct item.
+
+    // Wait, if we are on the portal, we want `onTabChange` to be called instead of `navigate`.
+    // So we should map the static items to use `onTabChange` if available and if the item ID matches a passed tab.
+
+    if (tabs && onTabChange) {
+      // Map over roleItems and replace action with onTabChange if it matches a tab
+      roleItems = roleItems.map(item => {
+        const matchingTab = tabs.find(t => t.id === item.id);
+        if (matchingTab) {
+          return {
+            ...item,
+            action: () => onTabChange(item.id),
+            isActive: activeTab === item.id
+          };
+        }
+        return item;
+      });
+    }
+
     return [
       ...commonItems,
+      ...roleItems,
+      { id: 'account', label: 'Account', icon: '⚙️', divider: true },
       { id: 'profile', label: 'Profile Settings', icon: '👤', action: () => navigate('/profile') },
       { id: 'logout', label: 'Logout', icon: '🚪', action: handleLogout }
     ]
@@ -94,20 +116,17 @@ export default function Navigation({ user, currentPage, tabs, activeTab, onTabCh
 
   return (
     <>
-      {/* Sidebar Toggle Button */}
       <button
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className="sidebar-toggle"
+        className="sidebar-toggle hidden md:flex"
         aria-label="Toggle navigation"
       >
         <span className="toggle-icon">{isSidebarOpen ? '✕' : '☰'}</span>
       </button>
 
-      {/* Professional Sidebar */}
       <div className={`professional-sidebar ${isSidebarOpen ? 'open' : ''}`}>
-        {/* Sidebar Header */}
         <div className="sidebar-header">
-          <button 
+          <button
             className="sidebar-close"
             onClick={() => setIsSidebarOpen(false)}
             aria-label="Close sidebar"
@@ -123,34 +142,28 @@ export default function Navigation({ user, currentPage, tabs, activeTab, onTabCh
           </div>
         </div>
 
-        {/* User Profile Section */}
         <div className="sidebar-profile">
           <div className="profile-avatar">
-            {currentPage === 'user' ? '👤' : 
-             currentPage === 'merchant' ? '🏪' :
-             currentPage === 'authority' ? '🏛️' : '👑'}
+            {user?.role === 'merchant' ? '🏪' :
+              ['municipality', 'beach_authority', 'forest_department'].includes(user?.role) ? '🏛️' :
+                user?.role === 'admin' ? '👑' : '👤'}
           </div>
           <div className="profile-info">
-            <div className="profile-name">{user?.phone_number}</div>
-            <div className="profile-role">{user?.role?.replace('_', ' ')}</div>
-            <div className="profile-status">
-              {currentPage === 'user' && (
-                <><span className="status-icon">💰</span> {user?.coin_balance || 0} Coins</>
-              )}
-              {currentPage === 'merchant' && (
-                <><span className="status-icon">💰</span> {user?.merchant_coins || 0} Coins</>
-              )}
-              {(currentPage === 'authority' || currentPage === 'admin') && (
-                <><span className="status-icon">✅</span> Authorized</>
-              )}
-            </div>
+            <div className="profile-name">{user?.phone_number || 'Guest'}</div>
+            <div className="profile-role">{user?.role?.replace('_', ' ') || 'Visitor'}</div>
+            {user && (
+              <div className="text-xs text-amber-400 mt-1">
+                {user.role === 'merchant' && `💰 ${user.merchant_coins || 0} Coins`}
+                {(!user.role || user.role === 'tourist') && `💰 ${user.coin_balance || 0} Coins`}
+                {(['municipality', 'beach_authority', 'forest_department', 'admin'].includes(user.role)) && '✅ Authorized'}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Navigation Menu */}
         <nav className="sidebar-nav">
-          {getNavigationItems().map((item) => (
-            <div key={item.id}>
+          {getNavigationItems().map((item, index) => (
+            <div key={item.id || index}>
               {item.divider && <div className="nav-divider">{item.label}</div>}
               {!item.divider && (
                 <button
@@ -158,10 +171,10 @@ export default function Navigation({ user, currentPage, tabs, activeTab, onTabCh
                     item.action()
                     setIsSidebarOpen(false)
                   }}
-                  className={`nav-item ${item.isActive ? 'active' : ''}`}
+                  className={`nav-item ${item.isActive || (currentPage === 'home' && item.id === 'home') ? 'active' : ''}`}
                 >
-                  <span className="nav-icon">{item.icon}</span>
-                  <span className="nav-label">{item.label}</span>
+                  <span className="text-xl">{item.icon}</span>
+                  <span>{item.label}</span>
                 </button>
               )}
             </div>
@@ -169,13 +182,74 @@ export default function Navigation({ user, currentPage, tabs, activeTab, onTabCh
         </nav>
       </div>
 
-      {/* Sidebar Overlay */}
       {isSidebarOpen && (
-        <div 
-          className="sidebar-overlay" 
+        <div
+          className="sidebar-overlay"
           onClick={() => setIsSidebarOpen(false)}
         ></div>
       )}
+      {/* Bottom Navigation for Mobile */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-lg border-t border-white/10 z-50 pb-safe">
+        <div className="flex justify-around items-center h-16">
+          {user && !['admin', 'merchant', 'municipality', 'beach_authority', 'fisheries_department'].includes(user.role) ? (
+            <>
+              <button
+                onClick={() => navigate('/user')}
+                className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${currentPage === 'user' && (!activeTab || activeTab === 'map') ? 'text-blue-400' : 'text-gray-400'}`}
+              >
+                <span className="text-xl">🗺️</span>
+                <span className="text-[10px] font-medium">Map</span>
+              </button>
+              <button
+                onClick={() => navigate('/user?tab=bin')}
+                className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'bin' ? 'text-blue-400' : 'text-gray-400'}`}
+              >
+                <span className="text-xl">🗑️</span>
+                <span className="text-[10px] font-medium">Bin</span>
+              </button>
+              <button
+                onClick={() => navigate('/user?tab=cleanup')}
+                className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'cleanup' ? 'text-blue-400' : 'text-gray-400'}`}
+              >
+                <span className="text-xl">🧹</span>
+                <span className="text-[10px] font-medium">Cleanup</span>
+              </button>
+              <button
+                onClick={() => navigate('/user?tab=wallet')}
+                className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab === 'wallet' ? 'text-blue-400' : 'text-gray-400'}`}
+              >
+                <span className="text-xl">💰</span>
+                <span className="text-[10px] font-medium">Wallet</span>
+              </button>
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="flex flex-col items-center justify-center w-full h-full space-y-1 text-gray-400"
+              >
+                <span className="text-xl">☰</span>
+                <span className="text-[10px] font-medium">Menu</span>
+              </button>
+            </>
+          ) : (
+            // Fallback for other roles or guests - simpler nav
+            <>
+              <button
+                onClick={() => navigate('/')}
+                className="flex flex-col items-center justify-center w-full h-full space-y-1 text-gray-400"
+              >
+                <span className="text-xl">🏠</span>
+                <span className="text-[10px] font-medium">Home</span>
+              </button>
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="flex flex-col items-center justify-center w-full h-full space-y-1 text-gray-400"
+              >
+                <span className="text-xl">☰</span>
+                <span className="text-[10px] font-medium">Menu</span>
+              </button>
+            </>
+          )}
+        </div>
+      </div>
     </>
   )
 }

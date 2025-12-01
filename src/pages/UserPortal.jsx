@@ -9,16 +9,22 @@ import DisposeEarn from '../components/DisposeEarn'
 import Wallet from '../components/Wallet'
 import SafetyReport from '../components/SafetyReport'
 import BeachSelector from '../components/BeachSelector'
+import BeachConditions from '../components/BeachConditions'
 import LocationUpdatePrompt from '../components/LocationUpdatePrompt'
 import ManualLocationManager from '../components/ManualLocationManager'
 import { locationService } from '../services/locationService'
+import Card from '../components/ui/Card'
+import Button from '../components/ui/Button'
 
 export default function UserPortal({ user }) {
   const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'map')
   const [coinBalance, setCoinBalance] = useState(0)
   const [pendingCoins, setPendingCoins] = useState(0)
-  const [selectedBeach, setSelectedBeach] = useState(null)
+  const [selectedBeach, setSelectedBeach] = useState(() => {
+    const saved = localStorage.getItem('selected_beach')
+    return saved ? JSON.parse(saved) : null
+  })
   const [beachMerchants, setBeachMerchants] = useState([])
   const [locationStatus, setLocationStatus] = useState({ valid: true, needsUpdate: false })
   const [showLocationPrompt, setShowLocationPrompt] = useState(false)
@@ -28,25 +34,24 @@ export default function UserPortal({ user }) {
   useEffect(() => {
     loadUserData()
     initializeLocationService()
-    
-    // Update tab when URL changes
+
     const tab = searchParams.get('tab')
     if (tab && tab !== activeTab) {
       setActiveTab(tab)
     }
   }, [user, searchParams])
 
-  // Removed location expiry timer - location is now permanent for all users
-
   useEffect(() => {
     if (selectedBeach) {
+      localStorage.setItem('selected_beach', JSON.stringify(selectedBeach))
       loadBeachMerchants()
+    } else {
+      localStorage.removeItem('selected_beach')
     }
   }, [selectedBeach])
 
   const initializeLocationService = async () => {
     if (!user) return
-    
     try {
       const result = await locationService.initializeForUser(user.id, user.role)
       setLocationStatus({
@@ -54,7 +59,6 @@ export default function UserPortal({ user }) {
         needsUpdate: result.needsUpdate,
         isPermanent: result.isPermanent
       })
-      
       if (result.success) {
         setLocationTimeRemaining(result.timeRemaining)
       }
@@ -66,13 +70,11 @@ export default function UserPortal({ user }) {
 
   const loadUserData = async () => {
     if (!user) return
-
     const { data } = await supabase
       .from('users')
       .select('coin_balance, pending_coins')
       .eq('id', user.id)
       .single()
-
     if (data) {
       setCoinBalance(data.coin_balance || 0)
       setPendingCoins(data.pending_coins || 0)
@@ -81,13 +83,9 @@ export default function UserPortal({ user }) {
 
   const loadBeachMerchants = async () => {
     if (!selectedBeach) return
-    
     try {
       const { data, error } = await supabase
-        .rpc('get_beach_merchants', {
-          beach_id_param: selectedBeach.beach_id
-        })
-      
+        .rpc('get_beach_merchants', { beach_id_param: selectedBeach.beach_id })
       if (error) throw error
       setBeachMerchants(data || [])
     } catch (err) {
@@ -96,7 +94,6 @@ export default function UserPortal({ user }) {
   }
 
   const handleLocationUpdated = async (result) => {
-    // Force refresh location status from database
     try {
       const freshStatus = await locationService.forceRefreshLocation(user.id, user.role)
       setLocationStatus({
@@ -105,30 +102,13 @@ export default function UserPortal({ user }) {
         isPermanent: freshStatus.isPermanent
       })
       setLocationTimeRemaining(freshStatus.timeRemaining || locationService.formatTimeRemaining())
-      
-      // Also reload user data to ensure everything is in sync
       await loadUserData()
     } catch (error) {
       console.error('Error refreshing location status:', error)
-      // Fallback to optimistic update
       setLocationStatus({ valid: true, needsUpdate: false })
       setLocationTimeRemaining(locationService.formatTimeRemaining())
     }
     setShowLocationPrompt(false)
-  }
-
-  const handleLocationPromptCancel = () => {
-    setShowLocationPrompt(false)
-    // User can manually choose which tab to go to
-  }
-
-  const requiresLocation = (tabId) => {
-    return ['map', 'bin', 'cleanup', 'dispose', 'safety', 'merchants'].includes(tabId)
-  }
-
-  const handleTabChange = (tabId) => {
-    // All users have permanent location access now
-    setActiveTab(tabId)
   }
 
   const handleLogout = () => {
@@ -138,213 +118,240 @@ export default function UserPortal({ user }) {
     navigate('/login', { replace: true })
   }
 
-  const tabs = [
-    { id: 'map', label: '🗺️ Map', icon: '🗺️', requiresLocation: true },
-    { id: 'bin', label: '🗑️ Report Bin', icon: '🗑️', requiresLocation: true },
-    { id: 'cleanup', label: '🧹 Cleanup', icon: '🧹', requiresLocation: true },
-    { id: 'dispose', label: '♻️ Dispose', icon: '♻️', requiresLocation: true },
-    { id: 'safety', label: '⚠️ Safety', icon: '⚠️', requiresLocation: true },
-    { id: 'merchants', label: '🏪 Merchants', icon: '🏪', requiresLocation: true },
-    { id: 'wallet', label: '💰 Wallet', icon: '💰', requiresLocation: false },
-    { id: 'profile', label: '👤 Profile', icon: '👤', requiresLocation: false }
-  ]
-
   return (
-    <div style={{ minHeight: '100vh' }}>
-      <Navigation user={{...user, coin_balance: coinBalance}} currentPage="user" />
+    <div className="min-h-screen pb-24 md:pb-20 bg-gradient-to-br from-black via-red-950 to-black">
+      <Navigation user={{ ...user, coin_balance: coinBalance }} currentPage="user" />
 
-
-
-
-
-      {/* Content */}
-      <main className="app-main">
-        <div className="content-container">
-          {activeTab === 'map' && (
-            <div className="content-section">
-              <div className="section-header">
-                <div>
-                  <h2 className="section-title">🗺️ Interactive Map</h2>
-                  <p className="section-subtitle">Explore beaches, check conditions, and find locations</p>
-                </div>
-              </div>
-              <div className="enhanced-card">
-                <BeachSelector 
-                  user={user} 
-                  onBeachSelect={setSelectedBeach} 
-                  selectedBeach={selectedBeach}
-                />
-              </div>
-              <MapView user={user} selectedBeach={selectedBeach} />
+      <main className="container pt-24 px-4 md:px-8 max-w-7xl mx-auto">
+        {activeTab === 'map' && (
+          <div className="animate-fade-in space-y-8">
+            <div className="text-center space-y-2">
+              <h2 className="text-4xl font-bold text-white tracking-tight">
+                <span className="text-gradient">Explore</span> The Coast
+              </h2>
+              <p className="text-gray-400 max-w-xl mx-auto">
+                Discover pristine beaches, check real-time conditions, and find local hotspots.
+              </p>
             </div>
-          )}
-          {activeTab === 'bin' && (
-            <div className="content-section">
-              <div className="section-header">
-                <div>
-                  <h2 className="section-title">🗑️ Report Bin</h2>
-                  <p className="section-subtitle">Report overflowing bins and earn coins</p>
-                </div>
-              </div>
-              {selectedBeach ? (
-                <BinReporter user={user} selectedBeach={selectedBeach} onUpdate={loadUserData} />
-              ) : (
-                <div className="enhanced-card" style={{ textAlign: 'center', padding: '3rem' }}>
-                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🏖️</div>
-                  <h3 style={{ color: 'white', marginBottom: '0.5rem' }}>Select a Beach First</h3>
-                  <p style={{ color: 'rgba(255,255,255,0.7)' }}>Please select a beach from the Map tab to report bins</p>
-                </div>
+
+            {/* Beach Selector - Now standalone for better visual impact */}
+            <div className="max-w-2xl mx-auto relative z-20 space-y-6">
+              <BeachSelector
+                user={user}
+                onBeachSelect={setSelectedBeach}
+                selectedBeach={selectedBeach}
+              />
+
+              {/* Beach Conditions Dashboard */}
+              {selectedBeach && (
+                <BeachConditions selectedBeach={selectedBeach} />
               )}
             </div>
-          )}
-          {activeTab === 'cleanup' && (
-            selectedBeach ? (
+
+            {/* Map Container */}
+            <div className="h-[calc(100vh-220px)] md:h-[65vh] rounded-2xl overflow-hidden shadow-2xl border border-white/10 relative z-10 glass-card p-0">
+              <MapView
+                user={user}
+                selectedBeach={selectedBeach}
+                onBeachSelect={setSelectedBeach}
+              />
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'bin' && (
+          <div className="animate-fade-in max-w-3xl mx-auto">
+            <div className="mb-8 text-center">
+              <h2 className="text-3xl font-bold text-white mb-2">🗑️ Report Bin</h2>
+              <p className="text-gray-400">Help keep our beaches clean by reporting overflowing bins.</p>
+            </div>
+            {selectedBeach ? (
+              <BinReporter user={user} selectedBeach={selectedBeach} onUpdate={loadUserData} />
+            ) : (
+              <Card className="text-center py-16 border-dashed border-2 border-white/10 bg-transparent">
+                <div className="text-6xl mb-4 opacity-50">🏖️</div>
+                <h3 className="text-xl font-bold text-white mb-2">No Beach Selected</h3>
+                <p className="text-gray-400">Please select a beach from the Map tab to report bins.</p>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'cleanup' && (
+          <div className="animate-fade-in max-w-3xl mx-auto">
+            <div className="mb-8 text-center">
+              <h2 className="text-3xl font-bold text-white mb-2">🧹 Beach Cleanup</h2>
+              <p className="text-gray-400">Join the movement. Clean up and earn rewards.</p>
+            </div>
+            {selectedBeach ? (
               <BeachCleanup user={user} selectedBeach={selectedBeach} onUpdate={loadUserData} />
             ) : (
-              <div style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.7)' }}>
-                Please select a beach from the Map tab first
-              </div>
-            )
-          )}
-          {activeTab === 'dispose' && (
-            selectedBeach ? (
+              <Card className="text-center py-16 border-dashed border-2 border-white/10 bg-transparent">
+                <div className="text-6xl mb-4 opacity-50">🏖️</div>
+                <h3 className="text-xl font-bold text-white mb-2">No Beach Selected</h3>
+                <p className="text-gray-400">Please select a beach from the Map tab first.</p>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'dispose' && (
+          <div className="animate-fade-in max-w-3xl mx-auto">
+            <div className="mb-8 text-center">
+              <h2 className="text-3xl font-bold text-white mb-2">♻️ Dispose & Earn</h2>
+              <p className="text-gray-400">Responsible disposal pays off. Scan and earn.</p>
+            </div>
+            {selectedBeach ? (
               <DisposeEarn user={user} selectedBeach={selectedBeach} onUpdate={loadUserData} />
             ) : (
-              <div style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.7)' }}>
-                Please select a beach from the Map tab first
-              </div>
-            )
-          )}
-          {activeTab === 'safety' && (
-            selectedBeach ? (
+              <Card className="text-center py-16 border-dashed border-2 border-white/10 bg-transparent">
+                <div className="text-6xl mb-4 opacity-50">🏖️</div>
+                <h3 className="text-xl font-bold text-white mb-2">No Beach Selected</h3>
+                <p className="text-gray-400">Please select a beach from the Map tab first.</p>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'safety' && (
+          <div className="animate-fade-in max-w-3xl mx-auto">
+            <div className="mb-8 text-center">
+              <h2 className="text-3xl font-bold text-white mb-2">⚠️ Safety Report</h2>
+              <p className="text-gray-400">Report hazards to keep everyone safe.</p>
+            </div>
+            {selectedBeach ? (
               <SafetyReport user={user} selectedBeach={selectedBeach} />
             ) : (
-              <div style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.7)' }}>
-                Please select a beach from the Map tab first
-              </div>
-            )
-          )}
-          {activeTab === 'merchants' && (
-            <div>
-              <h2 style={{ color: 'white', marginBottom: '1rem' }}>🏪 Local Merchants</h2>
-              {!selectedBeach ? (
-                <div style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.7)' }}>
-                  Please select a beach from the Map tab first
-                </div>
-              ) : beachMerchants.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.7)' }}>
-                  No merchants registered at {selectedBeach.name}
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {beachMerchants.map((merchant, index) => (
-                    <div key={index} style={{
-                      background: 'var(--glass-bg)',
-                      padding: '1rem',
-                      borderRadius: '8px',
-                      border: '1px solid var(--glass-border)'
-                    }}>
-                      <h4 style={{ color: 'white', margin: 0, marginBottom: '0.5rem' }}>
-                        🏪 {merchant.business_name}
-                      </h4>
-                      <div style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.8)' }}>
-                        <div>📱 {merchant.merchant_name}</div>
-                        <div>🏷️ {merchant.business_type}</div>
-                        {merchant.contact_phone && (
-                          <div>📞 {merchant.contact_phone}</div>
-                        )}
+              <Card className="text-center py-16 border-dashed border-2 border-white/10 bg-transparent">
+                <div className="text-6xl mb-4 opacity-50">🏖️</div>
+                <h3 className="text-xl font-bold text-white mb-2">No Beach Selected</h3>
+                <p className="text-gray-400">Please select a beach from the Map tab first.</p>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'merchants' && (
+          <div className="animate-fade-in">
+            <div className="mb-8 text-center">
+              <h2 className="text-3xl font-bold text-white mb-2">🏪 Local Merchants</h2>
+              <p className="text-gray-400">Redeem your hard-earned coins at these partners.</p>
+            </div>
+            {!selectedBeach ? (
+              <Card className="text-center py-16 border-dashed border-2 border-white/10 bg-transparent max-w-3xl mx-auto">
+                <div className="text-6xl mb-4 opacity-50">🏖️</div>
+                <h3 className="text-xl font-bold text-white mb-2">No Beach Selected</h3>
+                <p className="text-gray-400">Please select a beach from the Map tab first.</p>
+              </Card>
+            ) : beachMerchants.length === 0 ? (
+              <Card className="text-center py-16 max-w-3xl mx-auto">
+                <p className="text-gray-400">No merchants registered at {selectedBeach.name} yet.</p>
+              </Card>
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {beachMerchants.map((merchant, index) => (
+                  <Card key={index} hover className="border-t-4 border-t-red-500">
+                    <h4 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                      🏪 {merchant.business_name}
+                    </h4>
+                    <div className="space-y-2 text-sm text-gray-300">
+                      <div className="flex items-center gap-2">
+                        <span className="text-red-400">👤</span> {merchant.merchant_name}
                       </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-red-400">🏷️</span> {merchant.business_type}
+                      </div>
+                      {merchant.contact_phone && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-red-400">📞</span> {merchant.contact_phone}
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-          {activeTab === 'wallet' && (
-            <div className="content-section">
-              <div className="section-header">
-                <div>
-                  <h2 className="section-title">💰 My Wallet</h2>
-                  <p className="section-subtitle">Manage your coins and view transaction history</p>
-                </div>
+                  </Card>
+                ))}
               </div>
-              <Wallet user={user} coinBalance={coinBalance} />
+            )}
+          </div>
+        )}
+
+        {activeTab === 'wallet' && (
+          <div className="animate-fade-in max-w-4xl mx-auto">
+            <div className="mb-8 text-center">
+              <h2 className="text-3xl font-bold text-white mb-2">💰 My Wallet</h2>
+              <p className="text-gray-400">Track your earnings and transactions.</p>
             </div>
-          )}
-          {activeTab === 'profile' && (
-            <div className="space-y-6">
-              <div>
-                <h2 style={{ color: 'white', marginBottom: '1rem' }}>👤 Profile</h2>
-                <div style={{
-                  background: 'var(--glass-bg)',
-                  padding: '1.5rem',
-                  borderRadius: '12px',
-                  border: '1px solid var(--glass-border)'
-                }}>
-                  <div style={{ marginBottom: '1rem' }}>
-                    <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.875rem' }}>Phone Number</label>
-                    <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: '500' }}>
-                      {user.phone_number}
-                    </div>
+            <Wallet user={user} coinBalance={coinBalance} />
+          </div>
+        )}
+
+        {activeTab === 'profile' && (
+          <div className="animate-fade-in space-y-8 max-w-2xl mx-auto">
+            <div className="text-center">
+              <h2 className="text-3xl font-bold text-white mb-2">👤 Your Profile</h2>
+              <p className="text-gray-400">Manage your account and location settings.</p>
+            </div>
+
+            <Card className="overflow-hidden">
+              <div className="bg-gradient-to-r from-red-900/20 to-black p-6 border-b border-white/10">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-full bg-red-600 flex items-center justify-center text-3xl shadow-lg">
+                    {user.role === 'tourist' ? '🏖️' : '👤'}
                   </div>
-                  
-                  <div style={{ marginBottom: '1rem' }}>
-                    <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.875rem' }}>Role</label>
-                    <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: '500', textTransform: 'capitalize' }}>
-                      {user.role.replace('_', ' ')}
-                    </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white">{user.name || 'User'}</h3>
+                    <p className="text-red-400 capitalize">{user.role.replace('_', ' ')}</p>
                   </div>
-                  
-                  <div style={{ marginBottom: '1rem' }}>
-                    <label style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.875rem' }}>Location Status</label>
-                    <div style={{ color: locationStatus.isPermanent || locationStatus.valid ? '#10b981' : '#f59e0b', fontSize: '1.1rem', fontWeight: '500' }}>
-                      {locationStatus.isPermanent ? '✅ Permanent Access' : 
-                       locationStatus.valid ? `✅ Valid (${locationTimeRemaining})` : '⚠️ Expired - Update Required'}
-                    </div>
-                  </div>
-                  
-                  {user.role === 'tourist' && !locationStatus.valid && (
-                    <button
-                      onClick={() => setShowLocationPrompt(true)}
-                      className="btn btn-primary"
-                      style={{ width: '100%', marginTop: '1rem' }}
-                    >
-                      📍 Update Location
-                    </button>
-                  )}
-                  
-                  <button
-                    onClick={handleLogout}
-                    className="btn btn-secondary"
-                    style={{ width: '100%', marginTop: '1rem' }}
-                  >
-                    🚪 Logout
-                  </button>
                 </div>
               </div>
 
-              <div style={{
-                background: 'var(--glass-bg)',
-                padding: '1.5rem',
-                borderRadius: '12px',
-                border: '1px solid var(--glass-border)'
-              }}>
-                <ManualLocationManager user={user} />
+              <div className="p-6 space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+                    <label className="text-xs text-gray-500 uppercase tracking-wider">Phone</label>
+                    <div className="text-lg font-medium text-white mt-1">{user.phone_number}</div>
+                  </div>
+                  <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+                    <label className="text-xs text-gray-500 uppercase tracking-wider">Status</label>
+                    <div className={`text-lg font-medium mt-1 ${locationStatus.isPermanent || locationStatus.valid ? 'text-green-400' : 'text-amber-400'}`}>
+                      {locationStatus.isPermanent ? 'Permanent' : locationStatus.valid ? 'Active' : 'Expired'}
+                    </div>
+                  </div>
+                </div>
+
+                {user.role === 'tourist' && !locationStatus.valid && (
+                  <Button
+                    onClick={() => setShowLocationPrompt(true)}
+                    className="w-full"
+                    variant="primary"
+                  >
+                    📍 Update Location Access
+                  </Button>
+                )}
+
+                <Button
+                  onClick={handleLogout}
+                  variant="secondary"
+                  className="w-full"
+                >
+                  🚪 Logout
+                </Button>
               </div>
-            </div>
-          )}
-        </div>
+            </Card>
+
+            <Card>
+              <ManualLocationManager user={user} />
+            </Card>
+          </div>
+        )}
       </main>
 
-      {/* Location Update Prompt */}
       {showLocationPrompt && (
         <LocationUpdatePrompt
           user={user}
           onLocationUpdated={handleLocationUpdated}
-          onCancel={handleLocationPromptCancel}
+          onCancel={() => setShowLocationPrompt(false)}
         />
       )}
     </div>
   )
 }
-

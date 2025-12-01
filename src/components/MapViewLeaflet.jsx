@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { getBeachConditions } from '../services/weather'
 import { supabase } from '../lib/supabase'
+import Button from './ui/Button'
+import Card from './ui/Card'
+import BeachConditions from './BeachConditions'
 
 // Fix for default marker icons in Leaflet
 delete L.Icon.Default.prototype._getIconUrl
@@ -12,81 +14,78 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 })
 
-export default function MapViewLeaflet({ user }) {
+export default function MapViewLeaflet({ user, selectedBeach, onBeachSelect }) {
   const mapContainer = useRef(null)
   const map = useRef(null)
+  const markersRef = useRef([])
   const [safetyPins, setSafetyPins] = useState([])
-  const [selectedPin, setSelectedPin] = useState(null)
-  const [beachConditions, setBeachConditions] = useState(null)
   const [mapError, setMapError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
-  const [isSearching, setIsSearching] = useState(false)
-  const [userLocation, setUserLocation] = useState(null)
+  const [internalSelectedBeach, setInternalSelectedBeach] = useState(null)
 
+  // Initialize Map
   useEffect(() => {
     if (!mapContainer.current || map.current) return
 
-    // Small delay to ensure container is fully rendered
     const initMap = () => {
       if (!mapContainer.current || map.current) return
 
       try {
-        // Initialize Leaflet map
         map.current = L.map(mapContainer.current, {
-          zoomControl: true
-        }).setView([13.35, 74.7], 12) // Malpe, Karnataka
+          zoomControl: false
+        }).setView([13.35, 74.7], 12)
 
-        // Add OpenStreetMap tiles (completely free, no API key needed)
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '© OpenStreetMap contributors',
           maxZoom: 19
         }).addTo(map.current)
 
-        // Invalidate size to ensure map renders properly
+        L.control.zoom({
+          position: 'topright'
+        }).addTo(map.current)
+
         setTimeout(() => {
           if (map.current) {
             map.current.invalidateSize()
           }
         }, 200)
 
-        // Load safety pins after map is ready
-        setTimeout(() => {
-          loadSafetyPins()
-        }, 300)
+        // Load initial data
+        loadSafetyPins()
 
-        // Handle map clicks
+        // Map Click Handler
         map.current.on('click', async (e) => {
           const { lat, lng } = e.latlng
-          
-          // Check if there's a safety pin nearby
+
+          // Check if clicked near an existing pin
           const nearbyPin = safetyPins.find(pin => {
             const distance = getDistance(lat, lng, pin.gps_lat, pin.gps_lng)
-            return distance < 0.001 // ~100 meters
+            return distance < 0.001 // Approx 100m
           })
 
           if (nearbyPin) {
-            setSelectedPin(nearbyPin)
-            loadBeachConditions(nearbyPin.gps_lat, nearbyPin.gps_lng)
+            handlePinSelect(nearbyPin)
           } else {
-            // Create new pin on click
-            const newPin = {
+            // Treat as new location selection
+            const newLocation = {
+              beach_id: `loc_${lat.toFixed(4)}_${lng.toFixed(4)}`,
+              name: 'Selected Location',
+              district: 'Custom Selection',
               gps_lat: lat,
               gps_lng: lng,
-              report_count: 0,
-              danger_level: 'low'
+              is_custom: true
             }
-            setSelectedPin(newPin)
-            loadBeachConditions(lat, lng)
+            handleExternalSelect(newLocation)
           }
         })
+
       } catch (error) {
         console.error('Error initializing map:', error)
         setMapError('Failed to load map. Please refresh the page.')
       }
     }
 
-    // Initialize immediately or after a short delay
     if (mapContainer.current.offsetWidth > 0) {
       initMap()
     } else {
@@ -101,33 +100,41 @@ export default function MapViewLeaflet({ user }) {
     }
   }, [])
 
+  // Sync Markers with Safety Pins
   useEffect(() => {
     if (!map.current || !safetyPins.length) return
 
     // Clear existing markers
-    map.current.eachLayer((layer) => {
-      if (layer instanceof L.Marker) {
-        map.current.removeLayer(layer)
-      }
-    })
+    markersRef.current.forEach(marker => marker.remove())
+    markersRef.current = []
 
-    // Add markers for safety pins
     safetyPins.forEach(pin => {
       const marker = L.marker([pin.gps_lat, pin.gps_lng])
         .addTo(map.current)
         .bindPopup(`
-          <div style="padding: 0.5rem;">
+          <div style="padding: 0.5rem; color: #000;">
             <strong>${pin.danger_level.toUpperCase()} Danger</strong><br/>
             Reports: ${pin.report_count}
           </div>
         `)
 
       marker.on('click', () => {
-        setSelectedPin(pin)
-        loadBeachConditions(pin.gps_lat, pin.gps_lng)
+        handlePinSelect(pin)
       })
+
+      markersRef.current.push(marker)
     })
   }, [safetyPins])
+
+  // Sync Map View with Selected Beach Prop (External Update)
+  useEffect(() => {
+    if (map.current && selectedBeach) {
+      map.current.flyTo([selectedBeach.gps_lat, selectedBeach.gps_lng], 15, {
+        duration: 1.5
+      })
+      setInternalSelectedBeach(selectedBeach)
+    }
+  }, [selectedBeach])
 
   const loadSafetyPins = async () => {
     try {
@@ -137,22 +144,76 @@ export default function MapViewLeaflet({ user }) {
         .order('report_count', { ascending: false })
         .limit(50)
 
-      if (error) {
-        console.error('Error loading safety pins:', error)
-        return
-      }
-
-      if (data) {
-        setSafetyPins(data)
-      }
+      if (error) throw error
+      if (data) setSafetyPins(data)
     } catch (error) {
       console.error('Error loading safety pins:', error)
     }
   }
 
-  const loadBeachConditions = async (lat, lng) => {
-    const conditions = await getBeachConditions(lat, lng)
-    setBeachConditions(conditions)
+  const handlePinSelect = (pin) => {
+    const beachData = {
+      beach_id: pin.id || `pin_${pin.gps_lat}_${pin.gps_lng}`,
+      name: pin.location_name || 'Safety Report Location',
+      district: 'Map Selection',
+      gps_lat: pin.gps_lat,
+      gps_lng: pin.gps_lng,
+      danger_level: pin.danger_level,
+      report_count: pin.report_count
+    }
+    handleExternalSelect(beachData)
+  }
+
+  const handleExternalSelect = (beachData) => {
+    setInternalSelectedBeach(beachData)
+    if (onBeachSelect) {
+      onBeachSelect(beachData)
+    }
+  }
+
+  const searchLocation = async (query) => {
+    if (!query.trim()) {
+      setSearchResults([])
+      return
+    }
+
+    try {
+      // Relaxed query: search for exactly what the user typed, restricted to India
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=in`
+      )
+      const data = await response.json()
+      const results = data.map(item => ({
+        name: item.display_name.split(',')[0],
+        fullName: item.display_name,
+        lat: parseFloat(item.lat),
+        lng: parseFloat(item.lon)
+      }))
+      setSearchResults(results)
+    } catch (error) {
+      console.error('Search error:', error)
+    }
+  }
+
+  const goToLocation = (lat, lng, name) => {
+    if (map.current) {
+      map.current.setView([lat, lng], 15)
+      L.marker([lat, lng])
+        .addTo(map.current)
+        .bindPopup(`📍 ${name}`)
+        .openPopup()
+
+      const beachData = {
+        beach_id: `search_${lat}_${lng}`,
+        name: name,
+        district: 'Search Result',
+        gps_lat: lat,
+        gps_lng: lng
+      }
+      handleExternalSelect(beachData)
+    }
+    setSearchQuery('')
+    setSearchResults([])
   }
 
   const getDistance = (lat1, lng1, lat2, lng2) => {
@@ -162,116 +223,12 @@ export default function MapViewLeaflet({ user }) {
     const Δφ = (lat2 - lat1) * Math.PI / 180
     const Δλ = (lng2 - lng1) * Math.PI / 180
 
-    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ/2) * Math.sin(Δλ/2)
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) *
+      Math.sin(Δλ / 2) * Math.sin(Δλ / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 
     return R * c
-  }
-
-  const getDangerColor = (level) => {
-    const colors = {
-      low: '#10b981',
-      medium: '#f59e0b',
-      high: '#ef4444',
-      critical: '#dc2626'
-    }
-    return colors[level] || '#6b7280'
-  }
-
-  const searchLocation = async (query) => {
-    if (!query.trim()) {
-      setSearchResults([])
-      return
-    }
-
-    setIsSearching(true)
-    try {
-      // Predefined beach locations for better results
-      const knownBeaches = [
-        { name: 'Malpe Beach', lat: 13.3503, lng: 74.7042, district: 'Udupi' },
-        { name: 'Kaup Beach', lat: 13.2333, lng: 74.7500, district: 'Udupi' },
-        { name: 'Panambur Beach', lat: 12.8625, lng: 74.8097, district: 'Mangalore' },
-        { name: 'Tannirbhavi Beach', lat: 12.8333, lng: 74.8000, district: 'Mangalore' },
-        { name: 'Gokarna Beach', lat: 14.5492, lng: 74.3200, district: 'Uttara Kannada' },
-        { name: 'Om Beach', lat: 14.5333, lng: 74.3167, district: 'Gokarna' },
-        { name: 'Kudle Beach', lat: 14.5400, lng: 74.3150, district: 'Gokarna' },
-        { name: 'Half Moon Beach', lat: 14.5350, lng: 74.3100, district: 'Gokarna' },
-        { name: 'Paradise Beach', lat: 14.5300, lng: 74.3050, district: 'Gokarna' },
-        { name: 'Murudeshwar Beach', lat: 14.0942, lng: 74.4850, district: 'Bhatkal' },
-        { name: 'Karwar Beach', lat: 14.8142, lng: 74.1297, district: 'Karwar' },
-        { name: 'Devbagh Beach', lat: 14.8500, lng: 74.1000, district: 'Karwar' },
-        { name: 'Murdeshwar Temple Beach', lat: 14.0942, lng: 74.4850, district: 'Bhatkal' },
-        { name: 'Kundapura Beach', lat: 13.6167, lng: 74.6833, district: 'Kundapura' },
-        { name: 'Maravanthe Beach', lat: 13.6000, lng: 74.7000, district: 'Kundapura' },
-        { name: 'Ullal Beach', lat: 12.8000, lng: 74.8667, district: 'Mangalore' },
-        { name: 'Surathkal Beach', lat: 13.0167, lng: 74.7833, district: 'Mangalore' },
-        { name: 'Someshwar Beach', lat: 12.7833, lng: 74.8833, district: 'Mangalore' }
-      ]
-
-      // Filter known beaches first
-      const matchingBeaches = knownBeaches.filter(beach => 
-        beach.name.toLowerCase().includes(query.toLowerCase()) ||
-        beach.district.toLowerCase().includes(query.toLowerCase())
-      )
-
-      let results = matchingBeaches.map(beach => ({
-        name: beach.name,
-        fullName: `${beach.name}, ${beach.district}, Karnataka`,
-        lat: beach.lat,
-        lng: beach.lng
-      }))
-
-      // If no known beaches match, search online
-      if (results.length === 0) {
-        const searches = [
-          `${query} beach Karnataka India`,
-          `${query} coast Karnataka`,
-          `${query} Karnataka beach`
-        ]
-        
-        let allResults = []
-        
-        for (const searchTerm of searches) {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchTerm)}&limit=3&countrycodes=in&bounded=1&viewbox=73.5,15.5,75.5,11.5`
-          )
-          const data = await response.json()
-          allResults = [...allResults, ...data]
-        }
-        
-        // Remove duplicates and filter for coastal areas
-        const uniqueResults = allResults.filter((item, index, self) => 
-          index === self.findIndex(t => t.place_id === item.place_id)
-        )
-        
-        const coastalResults = uniqueResults.filter(item => {
-          const name = item.display_name.toLowerCase()
-          const type = item.type?.toLowerCase() || ''
-          return name.includes('beach') || 
-                 name.includes('coast') || 
-                 name.includes('shore') || 
-                 name.includes('bay') || 
-                 name.includes('karnataka') ||
-                 type.includes('beach')
-        })
-        
-        results = coastalResults.slice(0, 5).map(item => ({
-          name: item.display_name.split(',')[0],
-          fullName: item.display_name,
-          lat: parseFloat(item.lat),
-          lng: parseFloat(item.lon)
-        }))
-      }
-      
-      setSearchResults(results.slice(0, 8))
-    } catch (error) {
-      console.error('Search error:', error)
-      setSearchResults([])
-    } finally {
-      setIsSearching(false)
-    }
   }
 
   const getCurrentLocation = () => {
@@ -283,244 +240,136 @@ export default function MapViewLeaflet({ user }) {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords
-        setUserLocation({ lat: latitude, lng: longitude })
-        
         if (map.current) {
           map.current.setView([latitude, longitude], 15)
-          
-          // Add user location marker
           L.marker([latitude, longitude])
             .addTo(map.current)
             .bindPopup('📍 Your Location')
             .openPopup()
+
+          handleExternalSelect({
+            beach_id: 'current_location',
+            name: 'Current Location',
+            district: 'GPS',
+            gps_lat: latitude,
+            gps_lng: longitude
+          })
         }
       },
       (error) => {
         console.error('Geolocation error:', error)
-        alert('Unable to get your location. Please check your browser settings.')
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      { enableHighAccuracy: true }
     )
-  }
-
-  const goToLocation = (lat, lng, name) => {
-    if (map.current) {
-      map.current.setView([lat, lng], 15)
-      
-      // Add marker for searched location
-      L.marker([lat, lng])
-        .addTo(map.current)
-        .bindPopup(`📍 ${name}`)
-        .openPopup()
-      
-      // Load beach conditions for selected location
-      const beachPin = {
-        gps_lat: lat,
-        gps_lng: lng,
-        report_count: 0,
-        danger_level: 'low'
-      }
-      setSelectedPin(beachPin)
-      loadBeachConditions(lat, lng)
-    }
-    setSearchQuery('')
-    setSearchResults([])
   }
 
   if (mapError) {
     return (
-      <div style={{
-        background: 'white',
-        padding: '2rem',
-        borderRadius: '8px',
-        textAlign: 'center'
-      }}>
-        <p style={{ color: '#dc2626', marginBottom: '1rem' }}>{mapError}</p>
-        <button
-          onClick={() => window.location.reload()}
-          style={{
-            padding: '0.5rem 1rem',
-            background: '#1e40af',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer'
-          }}
-        >
-          Refresh Page
-        </button>
-      </div>
+      <Card className="text-center py-12">
+        <p className="text-red-400 mb-4">{mapError}</p>
+        <Button onClick={() => window.location.reload()}>Refresh Page</Button>
+      </Card>
     )
   }
 
   return (
-    <div className="map-container">
-      {/* Enhanced Map Header */}
-      <div className="map-header">
-        <div className="map-title-section">
-          <h2 className="map-title">🗺️ Interactive Beach Map</h2>
-          <p className="map-subtitle">Explore beaches, check safety conditions, and find locations</p>
+    <div className="relative w-full h-full min-h-[600px] rounded-xl overflow-hidden bg-black/20">
+      {/* Search Overlay */}
+      <div className="absolute top-4 left-4 right-4 z-[1000] flex flex-col gap-2 max-w-xs">
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+            🔍
+          </div>
+          <input
+            type="text"
+            placeholder="Search map..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value)
+              searchLocation(e.target.value)
+            }}
+            className="w-full pl-10 pr-4 py-2 bg-black/60 backdrop-blur-md border border-white/10 rounded-full text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all text-sm shadow-lg"
+          />
+        </div>
+
+        {searchResults.length > 0 && (
+          <div className="max-h-60 overflow-y-auto p-2 rounded-xl bg-black/90 backdrop-blur-xl border border-white/10 shadow-xl">
+            {searchResults.map((result, index) => (
+              <button
+                key={index}
+                onClick={() => goToLocation(result.lat, result.lng, result.name)}
+                className="w-full text-left p-2 hover:bg-white/10 rounded-lg flex items-center gap-3 transition-colors group"
+              >
+                <span className="text-lg">📍</span>
+                <div>
+                  <div className="font-medium text-white text-sm">{result.name}</div>
+                  <div className="text-[10px] text-gray-400 truncate">{result.fullName}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Map Container */}
+      <div
+        ref={mapContainer}
+        className="w-full h-full z-0"
+        style={{ minHeight: '600px' }}
+      />
+
+      {/* My Location Button */}
+      <div className="absolute top-4 right-4 z-[1000]">
+        <button
+          onClick={getCurrentLocation}
+          className="p-3 bg-black/60 backdrop-blur-md border border-white/10 rounded-full text-white hover:bg-white/10 transition-colors shadow-lg"
+          title="My Location"
+        >
+          📍
+        </button>
+      </div>
+
+      {/* Legend Overlay */}
+      <div className="absolute bottom-4 left-4 z-[1000]">
+        <div className="bg-black/60 backdrop-blur-md border border-white/10 rounded-lg p-2">
+          <div className="space-y-1 text-[10px] text-white font-medium">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span> Safe
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]"></span> Caution
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"></span> Danger
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Enhanced Location Search */}
-      <div className="map-search-section">
-        <div className="search-container">
-          <div className="search-input-wrapper">
-            <div className="search-icon">🔍</div>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value)
-                searchLocation(e.target.value)
-              }}
-              placeholder="Search beaches, locations, or coordinates..."
-              className="map-search-input"
-            />
-            {isSearching && (
-              <div className="search-loading">
-                <div className="search-spinner"></div>
+      {/* Selected Location Info & Conditions Overlay */}
+      {internalSelectedBeach && (
+        <div className="absolute bottom-4 right-4 left-4 md:left-auto md:w-80 z-[1000]">
+          <div className="bg-black/80 backdrop-blur-xl border border-red-500/30 shadow-2xl rounded-xl p-4 animate-slide-up">
+            <div className="flex justify-between items-start mb-3">
+              <div>
+                <h3 className="font-bold text-white text-sm">{internalSelectedBeach.name}</h3>
+                <p className="text-[10px] text-gray-400">{internalSelectedBeach.district}</p>
               </div>
-            )}
-          </div>
-          <button
-            onClick={getCurrentLocation}
-            className="current-location-btn"
-          >
-            <span className="location-icon">📍</span>
-            <span className="location-text">My Location</span>
-          </button>
-        </div>
-
-        {/* Enhanced Search Results */}
-        {searchResults.length > 0 && (
-          <div className="search-results">
-            <div className="search-results-header">
-              <span className="results-count">{searchResults.length} locations found</span>
-              <button 
-                onClick={() => { setSearchResults([]); setSearchQuery('') }}
-                className="clear-results-btn"
+              <button
+                onClick={() => setInternalSelectedBeach(null)}
+                className="text-gray-400 hover:text-white"
               >
                 ✕
               </button>
             </div>
-            <div className="search-results-list">
-              {searchResults.map((result, index) => (
-                <button
-                  key={index}
-                  onClick={() => goToLocation(result.lat, result.lng, result.name)}
-                  className="search-result-item"
-                >
-                  <div className="result-icon">🏖️</div>
-                  <div className="result-content">
-                    <div className="result-name">{result.name}</div>
-                    <div className="result-address">{result.fullName || result.name}</div>
-                    <div className="result-coords">
-                      📍 {result.lat.toFixed(4)}, {result.lng.toFixed(4)}
-                    </div>
-                  </div>
-                  <div className="result-arrow">→</div>
-                </button>
-              ))}
+
+            {/* Integrated Conditions - Compact Mode */}
+            <div className="mt-2">
+              <BeachConditions selectedBeach={internalSelectedBeach} compact={true} />
             </div>
           </div>
-        )}
-      </div>
-
-      {/* Enhanced Map Container */}
-      <div className="map-wrapper">
-        <div className="map-controls">
-          <div className="map-legend">
-            <div className="legend-item">
-              <span className="legend-marker safe"></span>
-              <span>Safe Areas</span>
-            </div>
-            <div className="legend-item">
-              <span className="legend-marker caution"></span>
-              <span>Caution Areas</span>
-            </div>
-            <div className="legend-item">
-              <span className="legend-marker danger"></span>
-              <span>Danger Areas</span>
-            </div>
-          </div>
-        </div>
-        
-        <div 
-          ref={mapContainer} 
-          className="interactive-map"
-        />
-        
-        {!selectedPin && (
-          <div className="map-instructions">
-            <div className="instruction-item">
-              <span className="instruction-icon">👆</span>
-              <span>Click on the map to get location info</span>
-            </div>
-            <div className="instruction-item">
-              <span className="instruction-icon">🔍</span>
-              <span>Search for specific beaches above</span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {selectedPin && (
-        <div className="location-info-panel">
-          <div className="location-header">
-            <h3 className="location-title">📍 Location Details</h3>
-            <button 
-              onClick={() => setSelectedPin(null)}
-              className="close-btn"
-            >
-              ✕
-            </button>
-          </div>
-
-          {beachConditions && (
-            <div className="conditions-card">
-              <div className="safety-status" style={{
-                background: `${beachConditions.safetyColor}20`,
-                borderColor: `${beachConditions.safetyColor}60`,
-                color: beachConditions.safetyColor
-              }}>
-                <span className="safety-icon">
-                  {beachConditions.safetyLevel === 'safe' ? '✅' : 
-                   beachConditions.safetyLevel === 'caution' ? '⚠️' : '🚨'}
-                </span>
-                <span className="safety-text">{beachConditions.safetyText}</span>
-              </div>
-
-              <div className="weather-grid">
-                <div className="weather-item">
-                  <div className="weather-value">🌊 {beachConditions.waveHeight?.toFixed(1) || 'N/A'}m</div>
-                  <div className="weather-label">Waves</div>
-                </div>
-                <div className="weather-item">
-                  <div className="weather-value">💨 {beachConditions.windSpeed?.toFixed(0) || 'N/A'}</div>
-                  <div className="weather-label">Wind km/h</div>
-                </div>
-                {beachConditions.windGusts > beachConditions.windSpeed + 5 && (
-                  <div className="weather-item danger">
-                    <div className="weather-value">💨 {beachConditions.windGusts?.toFixed(0)}</div>
-                    <div className="weather-label">Gusts</div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {selectedPin.report_count > 0 && (
-            <div className="danger-alert" style={{
-              backgroundColor: getDangerColor(selectedPin.danger_level)
-            }}>
-              ⚠️ {selectedPin.report_count} Report{selectedPin.report_count > 1 ? 's' : ''} • {selectedPin.danger_level.toUpperCase()}
-            </div>
-          )}
         </div>
       )}
     </div>
   )
 }
-

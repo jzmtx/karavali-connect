@@ -65,9 +65,9 @@ export default function Login() {
         role: userData.role,
         coin_balance: userData.coin_balance || 0
       }
-      
+
       localStorage.setItem('karavali_user', JSON.stringify(userSession))
-      
+
       // Dispatch event to notify other components
       window.dispatchEvent(new Event('karavali_user_changed'))
 
@@ -77,7 +77,7 @@ export default function Login() {
         setLoading(false)
         return
       }
-      
+
       if (selectedRole === 'tourist' && ['municipality', 'beach_authority', 'fisheries_department', 'admin'].includes(userData.role)) {
         setError('Invalid credentials for tourist login')
         setLoading(false)
@@ -194,8 +194,6 @@ export default function Login() {
             </Link>
           </p>
         </div>
-
-
       </div>
     </div>
   )

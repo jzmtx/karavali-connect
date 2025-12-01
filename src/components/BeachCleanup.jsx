@@ -41,7 +41,7 @@ export default function BeachCleanup({ user, selectedBeach, onUpdate }) {
       if (beforeUrlRef.current) {
         URL.revokeObjectURL(beforeUrlRef.current)
       }
-      
+
       const imageUrl = URL.createObjectURL(file)
       beforeUrlRef.current = imageUrl
       setBeforeImageUrl(imageUrl)
@@ -124,7 +124,7 @@ export default function BeachCleanup({ user, selectedBeach, onUpdate }) {
       if (afterUrlRef.current) {
         URL.revokeObjectURL(afterUrlRef.current)
       }
-      
+
       const imageUrl = URL.createObjectURL(file)
       afterUrlRef.current = imageUrl
       setAfterImageUrl(imageUrl)
@@ -162,7 +162,7 @@ export default function BeachCleanup({ user, selectedBeach, onUpdate }) {
       )
 
       const verificationResult = activityVerificationService.formatVerificationResult(verification)
-      
+
       if (!verificationResult.success) {
         throw new Error(verificationResult.message)
       }
@@ -249,13 +249,13 @@ export default function BeachCleanup({ user, selectedBeach, onUpdate }) {
       URL.revokeObjectURL(afterUrlRef.current)
       afterUrlRef.current = null
     }
-    
+
     // Clean up timer
     if (timerRef.current) {
       clearInterval(timerRef.current)
       timerRef.current = null
     }
-    
+
     setStep('start')
     setBeforeImage(null)
     setAfterImage(null)
@@ -359,24 +359,26 @@ export default function BeachCleanup({ user, selectedBeach, onUpdate }) {
           <p style={{ marginBottom: '1rem', color: '#6b7280' }}>
             Keep cleaning! Minimum 5 minutes required.
           </p>
-          {elapsedTime >= config.cleanupMinTime && (
-            <button
-              onClick={finishCleanup}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                background: '#10b981',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '1rem',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
-            >
-              Finished Cleaning
-            </button>
-          )}
+          <button
+            onClick={finishCleanup}
+            disabled={elapsedTime < config.cleanupMinTime}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              background: elapsedTime >= config.cleanupMinTime ? '#10b981' : '#9ca3af',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '1rem',
+              fontWeight: '600',
+              cursor: elapsedTime >= config.cleanupMinTime ? 'pointer' : 'not-allowed',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            {elapsedTime >= config.cleanupMinTime
+              ? 'Finished Cleaning'
+              : `Wait ${Math.ceil((config.cleanupMinTime - elapsedTime) / 1000)}s to Finish`}
+          </button>
         </div>
       )}
 

@@ -19,7 +19,7 @@ export const config = {
   
   // App Settings
   binReportCooldown: 4 * 60 * 60 * 1000, // 4 hours in milliseconds
-  cleanupMinTime: 5 * 60 * 1000, // 5 minutes in milliseconds
+  cleanupMinTime: 10 * 1000, // 10 seconds for testing (was 5 mins)
   disposeCooldown: 10 * 60 * 1000, // 10 minutes in milliseconds
   gpsAccuracy: 10, // meters
   qrCodeRefreshInterval: 30 * 1000, // 30 seconds

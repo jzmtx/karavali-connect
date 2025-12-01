@@ -4,6 +4,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import Navigation from '../components/Navigation'
 import LocationSearch from '../components/LocationSearch'
 import BeachSelector from '../components/BeachSelector'
+import Card from '../components/ui/Card'
+import Button from '../components/ui/Button'
+import Input from '../components/ui/Input'
+import QRious from 'qrious'
 
 export default function AuthorityPortal({ user }) {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -66,13 +70,13 @@ export default function AuthorityPortal({ user }) {
 
   const loadPaymentRequests = async () => {
     if (!user) return
-    
+
     if (user.role === 'beach_authority') {
       const { data } = await supabase
         .rpc('get_beach_payment_requests', {
           authority_id: user.id
         })
-      
+
       if (data) {
         setPaymentRequests(data)
       }
@@ -156,7 +160,7 @@ export default function AuthorityPortal({ user }) {
   const updatePaymentRequest = async (requestId, status) => {
     setLoading(true)
     try {
-      const updates = { 
+      const updates = {
         status,
         approved_by: user.id,
         approved_at: new Date().toISOString()
@@ -230,7 +234,7 @@ export default function AuthorityPortal({ user }) {
 
   const deleteUser = async (userId) => {
     if (!confirm('Are you sure you want to delete this user?')) return
-    
+
     setLoading(true)
     try {
       const { error } = await supabase
@@ -255,7 +259,7 @@ export default function AuthorityPortal({ user }) {
         .rpc('get_municipality_bins', {
           municipality_id: user.id
         })
-      
+
       if (data) setBins(data)
     } else {
       const { data } = await supabase
@@ -273,7 +277,7 @@ export default function AuthorityPortal({ user }) {
         .rpc('get_beach_authority_reports', {
           authority_id: user.id
         })
-      
+
       if (data) {
         const binData = data.filter(report => report.type === 'bin')
         setReports(binData)
@@ -295,7 +299,7 @@ export default function AuthorityPortal({ user }) {
         .rpc('get_beach_authority_reports', {
           authority_id: user.id
         })
-      
+
       if (data) {
         const safetyData = data.filter(report => ['danger', 'net'].includes(report.type))
         setSafetyReports(safetyData)
@@ -310,8 +314,6 @@ export default function AuthorityPortal({ user }) {
       if (data) setSafetyReports(data)
     }
   }
-
-
 
   const loadGhostNetReports = async () => {
     const { data } = await supabase
@@ -334,7 +336,6 @@ export default function AuthorityPortal({ user }) {
   }
 
   const generateQRCode = (text) => {
-    // Create proper QR code using QRious library
     const canvas = document.createElement('canvas')
     const qr = new QRious({
       element: canvas,
@@ -364,7 +365,7 @@ export default function AuthorityPortal({ user }) {
     setLoading(true)
     try {
       const qrCode = `karavali-bin-${newBin.bin_id}-${Date.now()}`
-      
+
       const { error } = await supabase
         .from('bins')
         .insert({
@@ -372,7 +373,8 @@ export default function AuthorityPortal({ user }) {
           qr_code: qrCode,
           gps_lat: parseFloat(newBin.gps_lat),
           gps_lng: parseFloat(newBin.gps_lng),
-          status: 'empty'
+          status: 'empty',
+          beach_id: user.assigned_beach_id
         })
 
       if (error) throw error
@@ -391,7 +393,7 @@ export default function AuthorityPortal({ user }) {
   const updateBinStatus = async (binId, status) => {
     setLoading(true)
     try {
-      const updates = { 
+      const updates = {
         status,
         last_reported_time: new Date().toISOString(),
         last_reported_by: user.id
@@ -450,7 +452,7 @@ export default function AuthorityPortal({ user }) {
         ]
     }
   }
-  
+
   const tabs = getTabsForRole()
 
   const handleTabChange = (tabId) => {
@@ -460,126 +462,97 @@ export default function AuthorityPortal({ user }) {
 
   const getRoleTitle = () => {
     switch (user?.role) {
-      case 'admin':
-        return 'Welcome to Admin Dashboard'
-      case 'beach_authority':
-        return 'Welcome to Beach Authority Dashboard'
-      case 'municipality':
-        return 'Welcome to Municipality Dashboard'
-      case 'fisheries_department':
-        return 'Welcome to Fisheries Department Dashboard'
-      default:
-        return 'Welcome to Authority Dashboard'
+      case 'admin': return 'Admin Dashboard'
+      case 'beach_authority': return 'Beach Authority Dashboard'
+      case 'municipality': return 'Municipality Dashboard'
+      case 'fisheries_department': return 'Fisheries Department Dashboard'
+      default: return 'Authority Dashboard'
     }
   }
 
   return (
-    <div className="app-layout">
-      <Navigation 
-        user={user} 
-        currentPage="authority" 
+    <div className="min-h-screen pb-20">
+      <Navigation
+        user={user}
+        currentPage="authority"
         tabs={tabs}
         activeTab={activeTab}
         onTabChange={handleTabChange}
       />
 
-      {/* Content */}
-      <main className="main-content">
-        <div className="container">
-          <div className="page-header">
-            <h1>{getRoleTitle()}</h1>
-          </div>
+      <main className="container pt-20">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-white">{getRoleTitle()}</h1>
+        </div>
+
         {error && (
-          <div className="alert alert-error">
+          <div className="alert alert-error mb-6">
             {error}
           </div>
         )}
 
         {message && (
-          <div className="alert alert-success">
+          <div className="alert alert-success mb-6">
             {message}
           </div>
         )}
 
-        <div className="glass-card">
+        <Card>
           {activeTab === 'beach' && (user?.role === 'beach_authority' || user?.role === 'municipality') && (
             <div>
-              <h2>🏖️ {user?.role === 'municipality' ? 'Municipality' : 'Beach Authority'} Assignment</h2>
+              <h2 className="text-xl font-bold text-white mb-4">🏖️ {user?.role === 'municipality' ? 'Municipality' : 'Beach Authority'} Assignment</h2>
               {user.assigned_beach_id ? (
-                <div style={{
-                  padding: '1.5rem',
-                  background: 'rgba(34, 197, 94, 0.2)',
-                  border: '1px solid rgba(34, 197, 94, 0.3)',
-                  borderRadius: '12px',
-                  textAlign: 'center'
-                }}>
-                  <h3 style={{ color: 'rgb(134, 239, 172)', margin: 0, marginBottom: '0.5rem' }}>
+                <div className="bg-green-500/20 border border-green-500/30 rounded-xl p-6 text-center">
+                  <h3 className="text-green-300 font-bold mb-2">
                     ✅ Assigned Beach: {user.assigned_beach_id.replace(/_/g, ' ')}
                   </h3>
-                  <p style={{ color: 'rgba(134, 239, 172, 0.8)', fontSize: '0.875rem', margin: 0 }}>
+                  <p className="text-green-300/80 text-sm">
                     Your beach assignment is permanent. You will receive all reports and manage payments for this beach.
                   </p>
                 </div>
               ) : (
                 <div>
-                  <div style={{
-                    padding: '1rem',
-                    background: 'rgba(255, 193, 7, 0.15)',
-                    border: '1px solid rgba(255, 193, 7, 0.3)',
-                    borderRadius: '8px',
-                    marginBottom: '1rem'
-                  }}>
-                    <p style={{ color: 'rgb(254, 240, 138)', margin: 0, fontSize: '0.875rem' }}>
+                  <div className="bg-amber-500/15 border border-amber-500/30 rounded-lg p-4 mb-4">
+                    <p className="text-amber-200 text-sm">
                       ⚠️ <strong>One-time Assignment:</strong> Once you select a beach, it becomes your permanent assignment.
                     </p>
                   </div>
-                  <BeachSelector 
-                    user={user} 
-                    onBeachSelect={handleBeachAssignment} 
+                  <BeachSelector
+                    user={user}
+                    onBeachSelect={handleBeachAssignment}
                     selectedBeach={selectedBeach}
                   />
                 </div>
               )}
             </div>
           )}
+
           {activeTab === 'users' && user?.role === 'admin' && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <h2>👥 User Management</h2>
-                <button
-                  onClick={() => setShowUserForm(!showUserForm)}
-                  className="btn btn-primary"
-                >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-white">👥 User Management</h2>
+                <Button onClick={() => setShowUserForm(!showUserForm)}>
                   ➕ Create User
-                </button>
+                </Button>
               </div>
 
               {showUserForm && (
-                <div style={{
-                  background: 'var(--glass-bg)',
-                  padding: '1rem',
-                  borderRadius: '8px',
-                  border: '1px solid var(--glass-border)',
-                  marginBottom: '1.5rem'
-                }}>
-                  <h3 style={{ marginBottom: '1rem' }}>Create New User</h3>
-                  <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: '1fr 1fr' }}>
+                <div className="bg-white/5 p-4 rounded-lg border border-white/10 mb-6">
+                  <h3 className="text-lg font-bold text-white mb-4">Create New User</h3>
+                  <div className="grid gap-4 md:grid-cols-2 mb-4">
+                    <Input
+                      label="Phone Number"
+                      type="tel"
+                      value={newUser.phone_number}
+                      onChange={(e) => setNewUser({ ...newUser, phone_number: e.target.value })}
+                      placeholder="9876543210"
+                    />
                     <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Phone Number</label>
-                      <input
-                        type="tel"
-                        value={newUser.phone_number}
-                        onChange={(e) => setNewUser({...newUser, phone_number: e.target.value})}
-                        placeholder="9876543210"
-                        className="form-input"
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Role</label>
+                      <label className="block text-gray-300 text-sm font-medium mb-2">Role</label>
                       <select
                         value={newUser.role}
-                        onChange={(e) => setNewUser({...newUser, role: e.target.value})}
-                        className="form-input"
+                        onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                        className="form-input w-full"
                       >
                         <option value="beach_authority">Beach Authority</option>
                         <option value="municipality">Municipality</option>
@@ -589,191 +562,62 @@ export default function AuthorityPortal({ user }) {
                       </select>
                     </div>
                   </div>
-                  <div style={{ marginTop: '1rem' }}>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Password</label>
-                    <input
-                      type="password"
-                      value={newUser.password}
-                      onChange={(e) => setNewUser({...newUser, password: e.target.value})}
-                      placeholder="Enter password"
-                      className="form-input"
-                    />
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-                    <button
-                      onClick={createUser}
-                      disabled={loading}
-                      className="btn btn-primary"
-                    >
+                  <Input
+                    label="Password"
+                    type="password"
+                    value={newUser.password}
+                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                    placeholder="Enter password"
+                  />
+                  <div className="flex gap-2 mt-4">
+                    <Button onClick={createUser} disabled={loading}>
                       Create User
-                    </button>
-                    <button
-                      onClick={() => setShowUserForm(false)}
-                      className="btn btn-secondary"
-                    >
+                    </Button>
+                    <Button variant="secondary" onClick={() => setShowUserForm(false)}>
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
 
               {users.length === 0 ? (
-                <p style={{ color: 'rgba(255,255,255,0.7)', textAlign: 'center', padding: '2rem' }}>
-                  No users found
-                </p>
+                <p className="text-gray-400 text-center py-8">No users found</p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="space-y-4">
                   {users.map(userItem => (
-                    <div
-                      key={userItem.id}
-                      style={{
-                        background: 'var(--glass-bg)',
-                        padding: '1rem',
-                        borderRadius: '8px',
-                        border: '1px solid var(--glass-border)'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                        <div>
-                          <h4 style={{ margin: 0, color: 'white' }}>
-                            📞 {userItem.phone_number}
-                          </h4>
-                          <p style={{ margin: '0.25rem 0', fontSize: '0.875rem', color: 'rgba(255,255,255,0.7)' }}>
-                            Role: {userItem.role}
-                          </p>
-                          <p style={{ margin: '0.25rem 0', fontSize: '0.875rem', color: 'rgba(255,255,255,0.7)' }}>
-                            Coins: {userItem.coin_balance || 0} | Pending: {userItem.pending_coins || 0}
-                          </p>
-                          <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>
-                            📅 Joined: {new Date(userItem.created_at).toLocaleDateString()}
-                          </div>
+                    <div key={userItem.id} className="bg-white/5 p-4 rounded-lg border border-white/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                      <div>
+                        <h4 className="text-white font-semibold">📞 {userItem.phone_number}</h4>
+                        <p className="text-sm text-gray-400">Role: {userItem.role}</p>
+                        <p className="text-sm text-gray-400">Coins: {userItem.coin_balance || 0} | Pending: {userItem.pending_coins || 0}</p>
+                        <div className="text-xs text-gray-500 mt-1">
+                          📅 Joined: {new Date(userItem.created_at).toLocaleDateString()}
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
-                          <select
-                            value={userItem.role}
-                            onChange={(e) => updateUserRole(userItem.id, e.target.value)}
-                            disabled={loading || userItem.id === user.id}
-                            style={{
-                              padding: '0.25rem 0.5rem',
-                              borderRadius: '4px',
-                              border: '1px solid var(--glass-border)',
-                              background: 'var(--glass-bg)',
-                              color: 'white',
-                              fontSize: '0.75rem'
-                            }}
+                      </div>
+                      <div className="flex flex-col gap-2 items-end w-full md:w-auto">
+                        <select
+                          value={userItem.role}
+                          onChange={(e) => updateUserRole(userItem.id, e.target.value)}
+                          disabled={loading || userItem.id === user.id}
+                          className="bg-black/30 border border-white/10 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-red-500"
+                        >
+                          <option value="beach_authority">Beach Authority</option>
+                          <option value="municipality">Municipality</option>
+                          <option value="fisheries_department">Fisheries Dept</option>
+                          <option value="merchant">Merchant</option>
+                          <option value="tourist">Tourist</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                        {userItem.id !== user.id && (
+                          <button
+                            onClick={() => deleteUser(userItem.id)}
+                            disabled={loading}
+                            className="text-red-400 hover:text-red-300 text-xs font-medium px-2 py-1 rounded bg-red-900/20 border border-red-900/30 transition-colors"
                           >
-                            <option value="beach_authority">Beach Authority</option>
-                            <option value="municipality">Municipality</option>
-                            <option value="fisheries_department">Department of Fisheries</option>
-                            <option value="merchant">Merchant</option>
-                            <option value="tourist">Tourist</option>
-                            <option value="admin">Admin</option>
-                          </select>
-                          {userItem.id !== user.id && (
-                            <button
-                              onClick={() => deleteUser(userItem.id)}
-                              disabled={loading}
-                              style={{
-                                padding: '0.25rem 0.5rem',
-                                background: 'rgba(239, 68, 68, 0.3)',
-                                color: 'rgb(252, 165, 165)',
-                                border: '1px solid rgba(239, 68, 68, 0.5)',
-                                borderRadius: '4px',
-                                fontSize: '0.75rem',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              🗑️ Delete
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'reports' && (
-            <div>
-              <h2>📋 Cleanup Reports</h2>
-              {reports.length === 0 ? (
-                <p style={{ color: 'rgba(255,255,255,0.7)', textAlign: 'center', padding: '2rem' }}>
-                  No reports found
-                </p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {reports.map(report => (
-                    <div
-                      key={report.report_id}
-                      style={{
-                        background: 'var(--glass-bg)',
-                        padding: '1rem',
-                        borderRadius: '8px',
-                        border: '1px solid var(--glass-border)'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.5rem' }}>
-                        <div>
-                          <h4 style={{ margin: 0, color: 'white' }}>
-                            {report.type.toUpperCase()} Report
-                          </h4>
-                          <p style={{ margin: '0.25rem 0', fontSize: '0.875rem', color: 'rgba(255,255,255,0.7)' }}>
-                            By: {report.users?.phone_number}
-                          </p>
-                        </div>
-                        <span style={{
-                          padding: '0.25rem 0.5rem',
-                          borderRadius: '12px',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          background: report.status === 'verified' ? 'rgba(34, 197, 94, 0.3)' : 
-                                     report.status === 'rejected' ? 'rgba(239, 68, 68, 0.3)' : 
-                                     'rgba(255, 193, 7, 0.3)',
-                          color: report.status === 'verified' ? 'rgb(134, 239, 172)' : 
-                                 report.status === 'rejected' ? 'rgb(252, 165, 165)' : 
-                                 'rgb(254, 240, 138)'
-                        }}>
-                          {report.status}
-                        </span>
-                      </div>
-                      
-                      {report.description && (
-                        <p style={{ margin: '0.5rem 0', fontSize: '0.875rem', color: 'rgba(255,255,255,0.8)' }}>
-                          {report.description}
-                        </p>
-                      )}
-                      
-                      <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', marginBottom: '1rem' }}>
-                        📅 {new Date(report.created_at).toLocaleString()}
-                        {report.gps_lat && (
-                          <span style={{ marginLeft: '1rem' }}>
-                            📍 {report.gps_lat.toFixed(4)}, {report.gps_lng.toFixed(4)}
-                          </span>
+                            🗑️ Delete
+                          </button>
                         )}
                       </div>
-
-                      {report.status === 'pending' && (
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button
-                            onClick={() => updateReportStatus(report.report_id, 'verified')}
-                            disabled={loading}
-                            className="btn btn-primary"
-                            style={{ fontSize: '0.875rem' }}
-                          >
-                            ✅ Verify
-                          </button>
-                          <button
-                            onClick={() => updateReportStatus(report.report_id, 'rejected')}
-                            disabled={loading}
-                            className="btn btn-secondary"
-                            style={{ fontSize: '0.875rem' }}
-                          >
-                            ❌ Reject
-                          </button>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -783,76 +627,63 @@ export default function AuthorityPortal({ user }) {
 
           {activeTab === 'payments' && (
             <div>
-              <h2>💳 Payment Requests</h2>
+              <h2 className="text-xl font-bold text-white mb-6">💳 Payment Requests</h2>
               {paymentRequests.length === 0 ? (
-                <p style={{ color: 'rgba(255,255,255,0.7)', textAlign: 'center', padding: '2rem' }}>
-                  No payment requests found
-                </p>
+                <p className="text-gray-400 text-center py-8">No payment requests found</p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="space-y-4">
                   {paymentRequests.map(request => (
-                    <div
-                      key={request.request_id}
-                      style={{
-                        background: 'var(--glass-bg)',
-                        padding: '1rem',
-                        borderRadius: '8px',
-                        border: '1px solid var(--glass-border)'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.5rem' }}>
+                    <div key={request.request_id} className="bg-white/5 p-4 rounded-lg border border-white/10">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
                         <div>
-                          <h4 style={{ margin: 0, color: 'white' }}>
-                            ₹{request.amount_requested.toFixed(2)}
-                          </h4>
-                          <p style={{ margin: '0.25rem 0', fontSize: '0.875rem', color: 'rgba(255,255,255,0.7)' }}>
-                            Merchant: {request.users?.phone_number}
-                          </p>
-                          <p style={{ margin: '0.25rem 0', fontSize: '0.875rem', color: 'rgba(255,255,255,0.7)' }}>
-                            {request.coins_amount} coins @ ₹{request.conversion_rate}/coin
-                          </p>
+                          <h4 className="text-white font-bold">Request from {request.users?.phone_number}</h4>
+                          <p className="text-lg font-semibold text-green-400">₹{request.amount_requested.toFixed(2)}</p>
+                          <p className="text-sm text-gray-400">{request.coins_amount} coins @ ₹{request.conversion_rate}/coin</p>
                         </div>
-                        <span style={{
-                          padding: '0.25rem 0.5rem',
-                          borderRadius: '12px',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          background: request.status === 'paid' ? 'rgba(34, 197, 94, 0.3)' : 
-                                     request.status === 'approved' ? 'rgba(59, 130, 246, 0.3)' :
-                                     request.status === 'rejected' ? 'rgba(239, 68, 68, 0.3)' : 
-                                     'rgba(255, 193, 7, 0.3)',
-                          color: request.status === 'paid' ? 'rgb(134, 239, 172)' : 
-                                 request.status === 'approved' ? 'rgb(147, 197, 253)' :
-                                 request.status === 'rejected' ? 'rgb(252, 165, 165)' : 
-                                 'rgb(254, 240, 138)'
-                        }}>
+                        <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${request.status === 'paid' ? 'bg-green-500/20 text-green-300' :
+                          request.status === 'approved' ? 'bg-blue-500/20 text-blue-300' :
+                            request.status === 'rejected' ? 'bg-red-500/20 text-red-300' :
+                              'bg-yellow-500/20 text-yellow-300'
+                          }`}>
                           {request.status}
                         </span>
                       </div>
-                      
-                      <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', marginBottom: '1rem' }}>
+
+                      <div className="text-xs text-gray-500 mb-4">
                         📅 {new Date(request.created_at).toLocaleString()}
                       </div>
 
                       {request.status === 'pending' && (
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
                             onClick={() => updatePaymentRequest(request.request_id, 'approved')}
                             disabled={loading}
-                            className="btn btn-primary"
-                            style={{ fontSize: '0.875rem' }}
+                            className="bg-blue-600 hover:bg-blue-700"
                           >
                             ✅ Approve
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
                             onClick={() => updatePaymentRequest(request.request_id, 'rejected')}
                             disabled={loading}
-                            className="btn btn-secondary"
-                            style={{ fontSize: '0.875rem' }}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
                           >
                             ❌ Reject
-                          </button>
+                          </Button>
                         </div>
+                      )}
+
+                      {request.status === 'approved' && (
+                        <Button
+                          size="sm"
+                          onClick={() => updatePaymentRequest(request.request_id, 'paid')}
+                          disabled={loading}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          💸 Mark as Paid
+                        </Button>
                       )}
                     </div>
                   ))}
@@ -860,172 +691,97 @@ export default function AuthorityPortal({ user }) {
               )}
             </div>
           )}
-
-          {/* Beach Authority - Safety Issues */}
-          {activeTab === 'safety' && user?.role === 'beach_authority' && (
+          {activeTab === 'bins' && (
             <div>
-              <h2>⚠️ Safety Issues & Ghost Nets</h2>
-              {safetyReports.length === 0 ? (
-                <p style={{ color: 'rgba(255,255,255,0.7)', textAlign: 'center', padding: '2rem' }}>
-                  No safety or ghost net reports found
-                </p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {safetyReports.map(report => (
-                    <div key={report.report_id} style={{
-                      background: 'var(--glass-bg)',
-                      padding: '1rem',
-                      borderRadius: '8px',
-                      border: '1px solid var(--glass-border)'
-                    }}>
-                      <h4 style={{ color: 'white', margin: 0 }}>
-                        {report.type === 'net' ? '🕸️ GHOST NET Report' : '⚠️ ' + report.type.toUpperCase() + ' Safety Issue'}
-                      </h4>
-                      <p style={{ margin: '0.5rem 0', color: 'rgba(255,255,255,0.8)' }}>{report.description}</p>
-                      <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>
-                        📅 {new Date(report.created_at).toLocaleString()}
-                        {report.gps_lat && <span style={{ marginLeft: '1rem' }}>📍 {report.gps_lat.toFixed(4)}, {report.gps_lng.toFixed(4)}</span>}
-                      </div>
-                      {report.status === 'pending' && (
-                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-                          <button onClick={() => updateReportStatus(report.report_id, 'verified')} className="btn btn-primary" style={{ fontSize: '0.875rem' }}>✅ Resolve</button>
-                          <button onClick={() => updateReportStatus(report.report_id, 'rejected')} className="btn btn-secondary" style={{ fontSize: '0.875rem' }}>❌ Dismiss</button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Municipality - Bin Management */}
-          {activeTab === 'bins' && (user?.role === 'municipality' || user?.role === 'admin') && (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <h2>🗑️ Bin Management</h2>
-                <button onClick={() => setShowBinForm(!showBinForm)} className="btn btn-primary">➕ Create Bin</button>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-white">🗑️ Bin Management</h2>
+                <Button onClick={() => setShowBinForm(!showBinForm)}>
+                  ➕ Add New Bin
+                </Button>
               </div>
 
               {showBinForm && (
-                <div style={{ background: 'var(--glass-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--glass-border)', marginBottom: '1.5rem' }}>
-                  <h3 style={{ marginBottom: '1rem' }}>Create New Bin</h3>
-                  <div style={{ display: 'grid', gap: '1rem' }}>
-                    <input 
-                      type="text" 
-                      value={newBin.bin_id} 
-                      onChange={(e) => setNewBin({...newBin, bin_id: e.target.value})} 
-                      placeholder="Bin ID (e.g., BIN001)" 
-                      className="form-input" 
+                <div className="bg-white/5 p-4 rounded-lg border border-white/10 mb-6 animate-fade-in">
+                  <h3 className="text-lg font-bold text-white mb-4">Register New Bin</h3>
+                  <div className="grid gap-4 md:grid-cols-2 mb-4">
+                    <Input
+                      label="Bin ID / Number"
+                      value={newBin.bin_id}
+                      onChange={(e) => setNewBin({ ...newBin, bin_id: e.target.value })}
+                      placeholder="BIN-001"
                     />
-                    
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', color: 'white', fontSize: '0.875rem' }}>
-                        🔍 Search Bin Location
-                      </label>
-                      <LocationSearch
-                        placeholder="Search bin location..."
-                        onLocationSelect={(location) => {
-                          setNewBin({
-                            ...newBin,
-                            gps_lat: location.lat.toString(),
-                            gps_lng: location.lng.toString(),
-                            location_name: location.name
-                          })
-                          setMessage(`📍 Location set: ${location.name}`)
-                        }}
-                      />
-                    </div>
-                    
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                      <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.2)' }}></div>
-                      <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem' }}>OR ENTER MANUALLY</span>
-                      <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.2)' }}></div>
-                    </div>
-                    
-                    <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: '1fr 1fr' }}>
-                      <input 
-                        type="number" 
-                        step="0.000001" 
-                        value={newBin.gps_lat} 
-                        onChange={(e) => setNewBin({...newBin, gps_lat: e.target.value})} 
-                        placeholder="Latitude" 
-                        className="form-input" 
-                      />
-                      <input 
-                        type="number" 
-                        step="0.000001" 
-                        value={newBin.gps_lng} 
-                        onChange={(e) => setNewBin({...newBin, gps_lng: e.target.value})} 
-                        placeholder="Longitude" 
-                        className="form-input" 
-                      />
-                    </div>
-                    
-                    {newBin.location_name && (
-                      <div style={{
-                        padding: '0.5rem',
-                        background: 'rgba(34, 197, 94, 0.2)',
-                        border: '1px solid rgba(34, 197, 94, 0.3)',
-                        borderRadius: '6px',
-                        color: 'rgb(134, 239, 172)',
-                        fontSize: '0.875rem'
-                      }}>
-                        📍 Selected: {newBin.location_name}
-                      </div>
-                    )}
+                    <Input
+                      label="Location Name"
+                      value={newBin.location_name}
+                      onChange={(e) => setNewBin({ ...newBin, location_name: e.target.value })}
+                      placeholder="Main Entrance"
+                    />
+                    <Input
+                      label="GPS Latitude"
+                      value={newBin.gps_lat}
+                      onChange={(e) => setNewBin({ ...newBin, gps_lat: e.target.value })}
+                      placeholder="13.3525"
+                    />
+                    <Input
+                      label="GPS Longitude"
+                      value={newBin.gps_lng}
+                      onChange={(e) => setNewBin({ ...newBin, gps_lng: e.target.value })}
+                      placeholder="74.7928"
+                    />
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-                    <button onClick={createBin} disabled={loading} className="btn btn-primary">Create Bin</button>
-                    <button onClick={() => setShowBinForm(false)} className="btn btn-secondary">Cancel</button>
+                  <div className="flex gap-2 mt-4">
+                    <Button onClick={createBin} disabled={loading}>
+                      Create Bin
+                    </Button>
+                    <Button variant="secondary" onClick={() => setShowBinForm(false)}>
+                      Cancel
+                    </Button>
                   </div>
                 </div>
               )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {bins.map(bin => (
-                  <div key={bin.bin_id} style={{ background: 'var(--glass-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+              {bins.length === 0 ? (
+                <p className="text-gray-400 text-center py-8">No bins registered yet</p>
+              ) : (
+                <div className="space-y-4">
+                  {bins.map(bin => (
+                    <div key={bin.bin_id} className="bg-white/5 p-4 rounded-lg border border-white/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                       <div>
-                        <h4 style={{ color: 'white', margin: 0 }}>🗑️ {bin.bin_id}</h4>
-                        <p style={{ margin: '0.25rem 0', fontSize: '0.875rem', color: 'rgba(255,255,255,0.7)' }}>QR: {bin.qr_code}</p>
-                        <p style={{ margin: '0.25rem 0', fontSize: '0.875rem', color: 'rgba(255,255,255,0.7)' }}>📍 {bin.gps_lat}, {bin.gps_lng}</p>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <span style={{ padding: '0.25rem 0.5rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '600', background: bin.status === 'empty' ? 'rgba(34, 197, 94, 0.3)' : bin.status === 'full' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 193, 7, 0.3)', color: bin.status === 'empty' ? 'rgb(134, 239, 172)' : bin.status === 'full' ? 'rgb(252, 165, 165)' : 'rgb(254, 240, 138)' }}>{bin.status}</span>
-                        <button onClick={() => downloadQR(bin.bin_id, bin.qr_code)} className="btn btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>📥 Download QR</button>
-                        <select value={bin.status} onChange={(e) => updateBinStatus(bin.bin_id, e.target.value)} style={{ padding: '0.25rem', borderRadius: '4px', border: '1px solid var(--glass-border)', background: 'var(--glass-bg)', color: 'white', fontSize: '0.75rem' }}>
-                          <option value="empty">Empty</option>
-                          <option value="full">Full</option>
-                          <option value="cleared">Cleared</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Municipality - Bin Reports */}
-          {activeTab === 'bin-reports' && user?.role === 'municipality' && (
-            <div>
-              <h2>📋 Bin Reports</h2>
-              {reports.length === 0 ? (
-                <p style={{ color: 'rgba(255,255,255,0.7)', textAlign: 'center', padding: '2rem' }}>No bin reports found</p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {reports.map(report => (
-                    <div key={report.report_id} style={{ background: 'var(--glass-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
-                      <h4 style={{ color: 'white', margin: 0 }}>🗑️ Bin Report - {report.bin_id}</h4>
-                      <p style={{ margin: '0.5rem 0', color: 'rgba(255,255,255,0.8)' }}>{report.description}</p>
-                      <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>📅 {new Date(report.created_at).toLocaleString()}</div>
-                      {report.status === 'pending' && (
-                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-                          <button onClick={() => updateReportStatus(report.report_id, 'verified')} className="btn btn-primary" style={{ fontSize: '0.875rem' }}>✅ Verify</button>
-                          <button onClick={() => updateReportStatus(report.report_id, 'rejected')} className="btn btn-secondary" style={{ fontSize: '0.875rem' }}>❌ Reject</button>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-white font-bold text-lg">🗑️ {bin.bin_id}</h4>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase ${bin.status === 'empty' ? 'bg-green-500/20 text-green-300' :
+                            bin.status === 'full' ? 'bg-red-500/20 text-red-300' :
+                              'bg-yellow-500/20 text-yellow-300'
+                            }`}>
+                            {bin.status}
+                          </span>
                         </div>
-                      )}
+                        <p className="text-sm text-gray-400">📍 {bin.gps_lat}, {bin.gps_lng}</p>
+                        {bin.last_reported_time && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Last update: {new Date(bin.last_reported_time).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-2 items-end w-full md:w-auto">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => downloadQR(bin.bin_id, bin.qr_code)}
+                        >
+                          ⬇️ QR Code
+                        </Button>
+                        {bin.status === 'full' && (
+                          <Button
+                            size="sm"
+                            onClick={() => updateBinStatus(bin.bin_id, 'cleared')}
+                            disabled={loading}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            ✅ Mark Cleared
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1033,55 +789,58 @@ export default function AuthorityPortal({ user }) {
             </div>
           )}
 
-          {/* Department of Fisheries - Ghost Nets */}
-          {activeTab === 'ghost-nets' && user?.role === 'fisheries_department' && (
+          {(activeTab === 'reports' || activeTab === 'bin-reports' || activeTab === 'ghost-nets' || activeTab === 'fisheries-safety') && (
             <div>
-              <h2>🕸️ Ghost Net Reports</h2>
+              <h2 className="text-xl font-bold text-white mb-6">📋 {activeTab === 'bin-reports' ? 'Bin Reports' : 'Reports'}</h2>
               {reports.length === 0 ? (
-                <p style={{ color: 'rgba(255,255,255,0.7)', textAlign: 'center', padding: '2rem' }}>No ghost net reports found</p>
+                <p className="text-gray-400 text-center py-8">No reports found</p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="space-y-4">
                   {reports.map(report => (
-                    <div key={report.report_id} style={{ background: 'var(--glass-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
-                      <h4 style={{ color: 'white', margin: 0 }}>🕸️ Ghost Net Report</h4>
-                      <p style={{ margin: '0.5rem 0', color: 'rgba(255,255,255,0.8)' }}>{report.description}</p>
-                      <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>
-                        📅 {new Date(report.created_at).toLocaleString()}
-                        {report.gps_lat && <span style={{ marginLeft: '1rem' }}>📍 {report.gps_lat.toFixed(4)}, {report.gps_lng.toFixed(4)}</span>}
-                      </div>
-                      {report.status === 'pending' && (
-                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-                          <button onClick={() => updateReportStatus(report.report_id, 'verified')} className="btn btn-primary" style={{ fontSize: '0.875rem' }}>✅ Schedule Removal</button>
-                          <button onClick={() => updateReportStatus(report.report_id, 'rejected')} className="btn btn-secondary" style={{ fontSize: '0.875rem' }}>❌ Mark Invalid</button>
+                    <div key={report.report_id} className="bg-white/5 p-4 rounded-lg border border-white/10">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
+                        <div>
+                          <h4 className="text-white font-bold uppercase">{report.type} Report</h4>
+                          <p className="text-sm text-gray-400">By: {report.users?.phone_number}</p>
                         </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Department of Fisheries - Marine Safety */}
-          {activeTab === 'fisheries-safety' && user?.role === 'fisheries_department' && (
-            <div>
-              <h2>🐟 Marine Safety Issues</h2>
-              {safetyReports.length === 0 ? (
-                <p style={{ color: 'rgba(255,255,255,0.7)', textAlign: 'center', padding: '2rem' }}>No marine safety reports found</p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {safetyReports.map(report => (
-                    <div key={report.report_id} style={{ background: 'var(--glass-bg)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
-                      <h4 style={{ color: 'white', margin: 0 }}>🐟 {report.type.toUpperCase()} - Marine Safety</h4>
-                      <p style={{ margin: '0.5rem 0', color: 'rgba(255,255,255,0.8)' }}>{report.description}</p>
-                      <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>
-                        📅 {new Date(report.created_at).toLocaleString()}
-                        {report.gps_lat && <span style={{ marginLeft: '1rem' }}>📍 {report.gps_lat.toFixed(4)}, {report.gps_lng.toFixed(4)}</span>}
+                        <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${report.status === 'verified' ? 'bg-green-500/20 text-green-300' :
+                          report.status === 'rejected' ? 'bg-red-500/20 text-red-300' :
+                            'bg-yellow-500/20 text-yellow-300'
+                          }`}>
+                          {report.status}
+                        </span>
                       </div>
+
+                      {report.description && (
+                        <p className="text-gray-300 text-sm mb-2">{report.description}</p>
+                      )}
+
+                      <div className="text-xs text-gray-500 mb-4">
+                        📅 {new Date(report.created_at).toLocaleString()}
+                        {report.gps_lat && (
+                          <span className="ml-4">📍 {report.gps_lat.toFixed(4)}, {report.gps_lng.toFixed(4)}</span>
+                        )}
+                      </div>
+
                       {report.status === 'pending' && (
-                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-                          <button onClick={() => updateReportStatus(report.report_id, 'verified')} className="btn btn-primary" style={{ fontSize: '0.875rem' }}>✅ Address Issue</button>
-                          <button onClick={() => updateReportStatus(report.report_id, 'rejected')} className="btn btn-secondary" style={{ fontSize: '0.875rem' }}>❌ Dismiss</button>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => updateReportStatus(report.report_id, 'verified')}
+                            disabled={loading}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            ✅ Verify
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => updateReportStatus(report.report_id, 'rejected')}
+                            disabled={loading}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                          >
+                            ❌ Reject
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -1092,40 +851,13 @@ export default function AuthorityPortal({ user }) {
           )}
 
           {activeTab === 'analytics' && (
-            <div>
-              <h2>📊 Analytics Dashboard</h2>
-              <div className="stats-grid">
-                <div className="stat-card">
-                  <span className="stat-number">{reports.length}</span>
-                  <div className="stat-label">Total Reports</div>
-                </div>
-                <div className="stat-card">
-                  <span className="stat-number">{reports.filter(r => r.status === 'verified').length}</span>
-                  <div className="stat-label">Verified Reports</div>
-                </div>
-                {(user?.role === 'beach_authority' || user?.role === 'admin') && (
-                  <div className="stat-card">
-                    <span className="stat-number">{paymentRequests.length}</span>
-                    <div className="stat-label">Payment Requests</div>
-                  </div>
-                )}
-                {(user?.role === 'municipality' || user?.role === 'admin') && (
-                  <div className="stat-card">
-                    <span className="stat-number">{bins.length}</span>
-                    <div className="stat-label">Total Bins</div>
-                  </div>
-                )}
-                {user?.role === 'admin' && (
-                  <div className="stat-card">
-                    <span className="stat-number">{users.length}</span>
-                    <div className="stat-label">Total Users</div>
-                  </div>
-                )}
-              </div>
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">📊</div>
+              <h3 className="text-xl font-bold text-white mb-2">Analytics Dashboard</h3>
+              <p className="text-gray-400">Coming soon: Detailed insights and statistics.</p>
             </div>
           )}
-          </div>
-        </div>
+        </Card>
       </main>
     </div>
   )
