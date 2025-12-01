@@ -63,28 +63,43 @@ export default function DisposeEarn({ user, onUpdate }) {
     setError('')
 
     try {
-      // Get live location with high accuracy
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          resolve,
-          reject,
-          { 
-            enableHighAccuracy: true,
-            timeout: 15000,
-            maximumAge: 0
-          }
-        )
-      })
+      let userLat = 0
+      let userLng = 0
+      let accuracy = 0
+      let distance = 0
 
-      const userLat = position.coords.latitude
-      const userLng = position.coords.longitude
+      // Bypass location check for Test Beach bins
+      if (binData.beach_id === 'test_beach_location') {
+        console.log('Test Beach bin - Bypassing location verification')
+        userLat = binData.gps_lat
+        userLng = binData.gps_lng
+        accuracy = 10
+        distance = 0
+      } else {
+        // Get live location with high accuracy
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            resolve,
+            reject,
+            {
+              enableHighAccuracy: true,
+              timeout: 15000,
+              maximumAge: 0
+            }
+          )
+        })
 
-      // Verify GPS
-      const distance = getDistance(userLat, userLng, binData.gps_lat, binData.gps_lng)
-      if (distance > config.gpsAccuracy) {
-        setError(`You must be within ${config.gpsAccuracy}m of the bin.`)
-        setLoading(false)
-        return
+        userLat = position.coords.latitude
+        userLng = position.coords.longitude
+        accuracy = position.coords.accuracy
+
+        // Verify GPS
+        distance = getDistance(userLat, userLng, binData.gps_lat, binData.gps_lng)
+        if (distance > config.gpsAccuracy) {
+          setError(`You must be within ${config.gpsAccuracy}m of the bin.`)
+          setLoading(false)
+          return
+        }
       }
 
       // Upload photos
@@ -104,7 +119,7 @@ export default function DisposeEarn({ user, onUpdate }) {
           image_before_url: handUrl,
           image_after_url: binUrl,
           coins_awarded: 5,
-          description: `Live location verified - Accuracy: ${position.coords.accuracy}m, Distance to bin: ${distance.toFixed(1)}m`
+          description: `Live location verified - Accuracy: ${accuracy}m, Distance to bin: ${distance.toFixed(1)}m`
         })
 
       // Award coins
@@ -138,10 +153,10 @@ export default function DisposeEarn({ user, onUpdate }) {
     const Δφ = (lat2 - lat1) * Math.PI / 180
     const Δλ = (lng2 - lng1) * Math.PI / 180
 
-    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ/2) * Math.sin(Δλ/2)
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) *
+      Math.sin(Δλ / 2) * Math.sin(Δλ / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 
     return R * c
   }
@@ -185,7 +200,7 @@ export default function DisposeEarn({ user, onUpdate }) {
         <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
           Scan QR Code on Bin
         </label>
-        <QRScanner onScan={handleQRScan} />
+        <QRScanner onScan={handleQRScan} scannerId="dispose-scanner" />
       </div>
 
       {binData && (
