@@ -309,7 +309,11 @@ export default function BeachCleanup({ user, selectedBeach, onUpdate }) {
           borderRadius: '8px',
           marginBottom: '1rem'
         }}>
-          <p style={{ marginBottom: error.includes('No trash detected') ? '0.5rem' : 0 }}>{error}</p>
+          <p style={{
+            marginBottom: error.includes('No trash detected') ? '0.5rem' : 0,
+            color: '#b91c1c', // Force dark red color for contrast against light background
+            fontWeight: '600'
+          }}>{error}</p>
           {error.includes('No trash detected') && (
             <button
               onClick={handleManualOverride}
