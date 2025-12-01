@@ -166,26 +166,42 @@ export default function BeachCleanup({ user, selectedBeach, onUpdate }) {
     try {
       const imageToUpload = currentAfterImage || afterImage
 
-      // Verify real-time GPS location for activity
-      const verification = await activityVerificationService.verifyActivityLocation(
-        user.id,
-        selectedBeach.beach_id,
-        'cleanup'
-      )
+      let verification = null
+      let userLat = 0
+      let userLng = 0
 
-      const verificationResult = activityVerificationService.formatVerificationResult(verification)
+      // Bypass location check for Test Beach
+      if (selectedBeach.beach_id === 'test_beach_location') {
+        console.log('Test Beach selected - Bypassing location verification')
+        verification = {
+          accuracy: 10,
+          distance: 0,
+          currentLocation: { lat: selectedBeach.gps_lat, lng: selectedBeach.gps_lng }
+        }
+        userLat = selectedBeach.gps_lat
+        userLng = selectedBeach.gps_lng
+      } else {
+        // Verify real-time GPS location for activity
+        verification = await activityVerificationService.verifyActivityLocation(
+          user.id,
+          selectedBeach.beach_id,
+          'cleanup'
+        )
 
-      if (!verificationResult.success) {
-        throw new Error(verificationResult.message)
+        const verificationResult = activityVerificationService.formatVerificationResult(verification)
+
+        if (!verificationResult.success) {
+          throw new Error(verificationResult.message)
+        }
+
+        // Check GPS accuracy
+        if (!activityVerificationService.isAccuracySufficient(verification.accuracy, 'cleanup')) {
+          throw new Error(`GPS accuracy too low (${Math.round(verification.accuracy)}m). Please wait for better signal or move to open area.`)
+        }
+
+        userLat = verification.currentLocation.lat
+        userLng = verification.currentLocation.lng
       }
-
-      // Check GPS accuracy
-      if (!activityVerificationService.isAccuracySufficient(verification.accuracy, 'cleanup')) {
-        throw new Error(`GPS accuracy too low (${Math.round(verification.accuracy)}m). Please wait for better signal or move to open area.`)
-      }
-
-      const userLat = verification.currentLocation.lat
-      const userLng = verification.currentLocation.lng
 
       // Upload images
       const beforeUrl = await uploadImage(beforeImage)
