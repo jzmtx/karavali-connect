@@ -29,10 +29,20 @@ export async function detectTrash(image) {
   }
 
   try {
-    const predictions = await model.detect(image)
+    // Lower threshold to catch more items (default is 0.5)
+    const predictions = await model.detect(image, 100, 0.3)
     
-    // Trash-related objects from COCO-SSD
-    const trashKeywords = ['bottle', 'cup', 'bowl', 'fork', 'knife', 'spoon', 'banana', 'apple', 'sandwich', 'pizza']
+    // Trash-related objects from COCO-SSD (expanded list)
+    const trashKeywords = [
+      // Food/Organic
+      'bottle', 'cup', 'bowl', 'fork', 'knife', 'spoon', 'banana', 'apple', 'sandwich', 'pizza', 'orange', 'broccoli', 'carrot', 'hot dog', 'donut', 'cake',
+      // Containers/Paper/Plastic
+      'wine glass', 'vase', 'book', 'suitcase', 'handbag', 'backpack', 'umbrella', 'scissors',
+      // Electronics (e-waste)
+      'cell phone', 'mouse', 'remote', 'keyboard', 'laptop', 'tv',
+      // Sports/Outdoors
+      'sports ball', 'frisbee', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket'
+    ]
     
     const trashDetected = predictions.some(prediction => {
       const className = prediction.class.toLowerCase()
