@@ -25,6 +25,7 @@ export default function MerchantPortal({ user }) {
   const [paymentRequests, setPaymentRequests] = useState([])
   const [showPaymentForm, setShowPaymentForm] = useState(false)
   const [paymentCoins, setPaymentCoins] = useState('')
+  const [upiId, setUpiId] = useState('')
   const [locationStatus, setLocationStatus] = useState({ valid: true, needsUpdate: false })
   const [showLocationPrompt, setShowLocationPrompt] = useState(false)
   const [locationTimeRemaining, setLocationTimeRemaining] = useState('')
@@ -131,12 +132,12 @@ export default function MerchantPortal({ user }) {
     if (!user) return
     const { data } = await supabase
       .from('users')
-      .select('merchant_coins')
+      .select('coin_balance')
       .eq('id', user.id)
       .single()
 
     if (data) {
-      setMerchantCoins(data.merchant_coins || 0)
+      setMerchantCoins(data.coin_balance || 0)
     }
   }
 
@@ -231,6 +232,11 @@ export default function MerchantPortal({ user }) {
       return
     }
 
+    if (!upiId || !upiId.includes('@')) {
+      setError('Please enter a valid UPI ID (e.g., name@upi)')
+      return
+    }
+
     const coins = parseInt(paymentCoins)
     if (coins > merchantCoins) {
       setError(`You only have ${merchantCoins} merchant coins`)
@@ -256,6 +262,7 @@ export default function MerchantPortal({ user }) {
           coins_amount: coins,
           amount_requested: amountRequested,
           conversion_rate: conversionRate,
+          upi_id: upiId,
           status: 'pending'
         })
 
@@ -264,6 +271,7 @@ export default function MerchantPortal({ user }) {
       setMessage(`✅ Payment request submitted! ₹${amountRequested.toFixed(2)} for ${coins} coins.`)
       setShowPaymentForm(false)
       setPaymentCoins('')
+      setUpiId('')
       loadPaymentRequests()
       loadMerchantData()
     } catch (err) {
@@ -447,13 +455,22 @@ export default function MerchantPortal({ user }) {
                   min="1"
                   max={merchantCoins}
                 />
+                <div className="mt-4">
+                  <Input
+                    label="UPI ID (for receiving payment)"
+                    type="text"
+                    value={upiId}
+                    onChange={(e) => setUpiId(e.target.value)}
+                    placeholder="e.g. business@okaxis"
+                  />
+                </div>
                 <div className="flex gap-2 mt-4">
-                  <Button onClick={submitPaymentRequest} disabled={loading || !paymentCoins}>
+                  <Button onClick={submitPaymentRequest} disabled={loading || !paymentCoins || !upiId}>
                     Submit Request
                   </Button>
                   <Button
                     variant="secondary"
-                    onClick={() => { setShowPaymentForm(false); setPaymentCoins('') }}
+                    onClick={() => { setShowPaymentForm(false); setPaymentCoins(''); setUpiId('') }}
                   >
                     Cancel
                   </Button>
@@ -486,8 +503,8 @@ export default function MerchantPortal({ user }) {
                     </div>
                     <div className="text-sm text-gray-400 mb-2">
                       Status: <span className={`font-semibold ${request.status === 'paid' ? 'text-green-400' :
-                          request.status === 'approved' ? 'text-blue-400' :
-                            request.status === 'rejected' ? 'text-red-400' : 'text-yellow-400'
+                        request.status === 'approved' ? 'text-blue-400' :
+                          request.status === 'rejected' ? 'text-red-400' : 'text-yellow-400'
                         }`}>{request.status}</span>
                     </div>
                     <div className="text-xs text-gray-500">

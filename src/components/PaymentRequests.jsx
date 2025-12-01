@@ -9,7 +9,7 @@ export default function PaymentRequests({ user }) {
 
   useEffect(() => {
     loadRequests()
-    
+
     // Refresh every 30 seconds
     const interval = setInterval(() => {
       loadRequests()
@@ -198,6 +198,26 @@ export default function PaymentRequests({ user }) {
                     <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
                       Requested: {new Date(request.created_at).toLocaleString()}
                     </div>
+                    {request.upi_id && (
+                      <div style={{
+                        fontSize: '0.875rem',
+                        color: '#1e40af',
+                        marginTop: '0.25rem',
+                        background: '#eff6ff',
+                        padding: '0.25rem 0.5rem',
+                        borderRadius: '4px',
+                        display: 'inline-block',
+                        cursor: 'pointer'
+                      }}
+                        onClick={() => {
+                          navigator.clipboard.writeText(request.upi_id)
+                          alert('UPI ID copied: ' + request.upi_id)
+                        }}
+                        title="Click to copy"
+                      >
+                        💳 UPI: <strong>{request.upi_id}</strong> 📋
+                      </div>
+                    )}
                     {request.notes && (
                       <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem', fontStyle: 'italic' }}>
                         Notes: {request.notes}
@@ -259,7 +279,7 @@ export default function PaymentRequests({ user }) {
                       </button>
                     </>
                   )}
-                  
+
                   {request.status === 'approved' && (
                     <button
                       onClick={() => handleMarkPaid(request.request_id)}

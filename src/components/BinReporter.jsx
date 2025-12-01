@@ -25,11 +25,11 @@ export default function BinReporter({ user, onUpdate }) {
           reject(new Error('Geolocation is not supported by this browser'))
           return
         }
-        
+
         navigator.geolocation.getCurrentPosition(
           resolve,
           (error) => {
-            switch(error.code) {
+            switch (error.code) {
               case error.PERMISSION_DENIED:
                 reject(new Error('Location access denied. Please enable location permissions.'))
                 break
@@ -64,15 +64,21 @@ export default function BinReporter({ user, onUpdate }) {
       }
 
       // Verify GPS location (must be within 10 meters)
-      const distance = getDistance(userLat, userLng, data.gps_lat, data.gps_lng)
-      if (distance > 10) {
-        setError(`You must be within 10m of the bin. Current distance: ${distance.toFixed(1)}m`)
-        return
+      // Bypass for Test Beach bins
+      if (data.beach_id === 'test_beach_location') {
+        console.log('Test Beach bin - Bypassing location verification')
+        // Mock success
+      } else {
+        const distance = getDistance(userLat, userLng, data.gps_lat, data.gps_lng)
+        if (distance > 10) {
+          setError(`You must be within 10m of the bin. Current distance: ${distance.toFixed(1)}m`)
+          return
+        }
       }
 
       setBinData(data)
       setMessage(`✅ Bin ${data.bin_id} verified! Current status: ${data.status.toUpperCase()}`)
-      
+
     } catch (err) {
       console.error('QR scan error:', err)
       setError(err.message || 'Failed to verify bin QR code')
@@ -86,10 +92,10 @@ export default function BinReporter({ user, onUpdate }) {
     const Δφ = ((lat2 - lat1) * Math.PI) / 180
     const Δλ = ((lng2 - lng1) * Math.PI) / 180
 
-    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ/2) * Math.sin(Δλ/2)
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) *
+      Math.sin(Δλ / 2) * Math.sin(Δλ / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 
     return Math.round(R * c * 100) / 100 // Round to 2 decimal places for precision
   }
@@ -113,9 +119,9 @@ export default function BinReporter({ user, onUpdate }) {
     try {
       const position = await new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(
-          resolve, 
-          reject, 
-          { 
+          resolve,
+          reject,
+          {
             enableHighAccuracy: true,
             timeout: 15000,
             maximumAge: 0
@@ -135,7 +141,7 @@ export default function BinReporter({ user, onUpdate }) {
       if (newStatus === 'full' && binData.status !== 'full') {
         await supabase
           .from('bins')
-          .update({ 
+          .update({
             status: 'full',
             last_reported_time: new Date().toISOString(),
             last_reported_by: user.id
@@ -230,7 +236,7 @@ export default function BinReporter({ user, onUpdate }) {
         <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
           Scan QR Code on Bin
         </label>
-        <QRScanner onScan={handleQRScan} />
+        <QRScanner onScan={handleQRScan} scannerId="bin-scanner" />
       </div>
 
       {binData && (
