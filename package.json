@@ -12,6 +12,7 @@
     "@tensorflow-models/coco-ssd": "^2.2.3",
     "@tensorflow/tfjs": "^4.15.0",
     "axios": "^1.6.2",
+    "firebase": "^10.7.1",
     "html5-qrcode": "^2.3.8",
     "leaflet": "^1.9.4",
     "mapbox-gl": "^3.0.1",

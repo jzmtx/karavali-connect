@@ -14,6 +14,7 @@ A Progressive Web App (PWA) for coastal civic engagement, rewards, and safety re
 - **Backend**: Supabase (PostgreSQL)
 - **Maps**: Mapbox GL JS
 - **AI**: TensorFlow.js (COCO-SSD) for trash detection
+- **Notifications**: Firebase Cloud Messaging (FCM)
 - **Alerts**: Telegram Bot API
 - **Storage**: Cloudinary
 - **Weather**: Open-Meteo Marine API
@@ -37,20 +38,32 @@ cp .env.example .env
 **Required Services:**
 - **Supabase**: Create project at https://supabase.com
 - **Mapbox**: Get token from https://account.mapbox.com/access-tokens/
-- **Telegram Bot**: Create via @BotFather on Telegram
-- **Cloudinary**: Sign up at https://cloudinary.com
+- **Firebase**: Create project at https://console.firebase.google.com (for push notifications)
+- **Telegram Bot**: Create via @BotFather on Telegram (optional)
+- **Cloudinary**: Sign up at https://cloudinary.com (optional)
 
-### 3. Set Up Supabase Database
+### 3. Set Up Firebase Cloud Messaging (Optional)
+
+For real-time push notifications to authorities:
+
+See [FIREBASE_SETUP.md](./FIREBASE_SETUP.md) for detailed setup instructions.
+
+### 4. Set Up Supabase Database
 
 Run the SQL schema in `supabase/schema.sql` in your Supabase SQL editor.
 
-### 4. Run Development Server
+**For FCM notifications**, also run:
+```bash
+supabase/migrations/20251225_fcm_notifications.sql
+```
+
+### 5. Run Development Server
 
 ```bash
 npm run dev
 ```
 
-### 5. Build for Production
+### 6. Build for Production
 
 ```bash
 npm run build

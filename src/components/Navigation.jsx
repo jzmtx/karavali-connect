@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-export default function Navigation({ user, currentPage, tabs, activeTab, onTabChange }) {
+export default function Navigation({ user, currentPage, tabs, activeTab, onTabChange, rightContent }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const navigate = useNavigate()
 
@@ -120,6 +120,22 @@ export default function Navigation({ user, currentPage, tabs, activeTab, onTabCh
 
   return (
     <>
+      {/* Top Header Bar with Notification Bell */}
+      {rightContent && (
+        <div className="fixed top-0 left-0 right-0 bg-black/90 backdrop-blur-lg border-b border-white/10 z-40 h-16 flex items-center justify-between px-4">
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
+            aria-label="Toggle navigation"
+          >
+            <span className="text-2xl">{isSidebarOpen ? '✕' : '☰'}</span>
+          </button>
+          <div className="flex items-center gap-4">
+            {rightContent}
+          </div>
+        </div>
+      )}
+
       <button
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
         className="sidebar-toggle hidden md:flex"

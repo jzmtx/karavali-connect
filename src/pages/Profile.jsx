@@ -254,3 +254,4 @@ export default function Profile({ user }) {
     </div>
   )
 }
+

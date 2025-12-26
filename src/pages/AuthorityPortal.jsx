@@ -8,6 +8,9 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import QRious from 'qrious'
+import { notificationService } from '../services/notificationService'
+import NotificationBell from '../components/NotificationBell'
+import NotificationToast from '../components/NotificationToast'
 
 export default function AuthorityPortal({ user }) {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -25,6 +28,7 @@ export default function AuthorityPortal({ user }) {
   const [newUser, setNewUser] = useState({ phone_number: '', role: 'beach_authority', password: '' })
   const [newBin, setNewBin] = useState({ bin_id: '', gps_lat: '', gps_lng: '', location_name: '' })
   const [selectedBeach, setSelectedBeach] = useState(null)
+  const [foregroundNotification, setForegroundNotification] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -50,7 +54,40 @@ export default function AuthorityPortal({ user }) {
     } else {
       loadReports()
     }
+
+    // Request notification permission
+    if (user) {
+      notificationService.requestPermission(user.id)
+    }
   }, [user])
+
+  // Listen for foreground notifications
+  useEffect(() => {
+    const setupForegroundListener = async () => {
+      try {
+        notificationService.onMessageListener().then(payload => {
+          console.log('Received foreground notification:', payload)
+          setForegroundNotification(payload)
+
+          // Refresh data based on notification type
+          const notifType = payload.data?.type
+          if (notifType === 'payment_request') {
+            loadPaymentRequests()
+          } else if (notifType === 'safety_report') {
+            loadSafetyReports()
+          } else if (notifType === 'bin_overflow') {
+            loadBins()
+          } else {
+            loadReports()
+          }
+        })
+      } catch (error) {
+        console.error('Error setting up foreground listener:', error)
+      }
+    }
+
+    setupForegroundListener()
+  }, [])
 
   const loadReports = async () => {
     if (!user) return
@@ -478,7 +515,16 @@ export default function AuthorityPortal({ user }) {
         tabs={tabs}
         activeTab={activeTab}
         onTabChange={handleTabChange}
+        rightContent={<NotificationBell userId={user?.id} />}
       />
+
+      {/* Foreground Notification Toast */}
+      {foregroundNotification && (
+        <NotificationToast
+          notification={foregroundNotification}
+          onClose={() => setForegroundNotification(null)}
+        />
+      )}
 
       <main className="container pt-20">
         <div className="mb-6">
