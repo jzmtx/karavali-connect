@@ -10,21 +10,126 @@ ON CONFLICT (beach_id) DO UPDATE SET
   gps_lng = 76.6123884,
   radius_meters = 2000;
 
--- Create test users (REPLACE PHONE NUMBERS)
+-- Clean up foreign key references before deleting old test users
+-- Clear bin references
+UPDATE bins SET last_reported_by = NULL 
+WHERE last_reported_by IN (
+  SELECT id FROM users WHERE phone_number IN (
+    '1234567890', '1234567891', '1234567892', '1234567893', '1234567894',
+    '9999999901', '9999999902', '9999999903', '9999999904'
+  )
+);
+
+-- Delete related records for old test users
+DELETE FROM beach_merchants WHERE merchant_id IN (
+  SELECT id FROM users WHERE phone_number IN (
+    '1234567890', '1234567891', '1234567892', '1234567893', '1234567894',
+    '9999999901', '9999999902', '9999999903', '9999999904'
+  )
+);
+
+DELETE FROM transactions WHERE user_id IN (
+  SELECT id FROM users WHERE phone_number IN (
+    '1234567890', '1234567891', '1234567892', '1234567893', '1234567894',
+    '9999999901', '9999999902', '9999999903', '9999999904'
+  )
+);
+
+DELETE FROM transactions WHERE merchant_id IN (
+  SELECT id FROM users WHERE phone_number IN (
+    '1234567890', '1234567891', '1234567892', '1234567893', '1234567894',
+    '9999999901', '9999999902', '9999999903', '9999999904'
+  )
+);
+
+DELETE FROM merchant_redemptions WHERE user_id IN (
+  SELECT id FROM users WHERE phone_number IN (
+    '1234567890', '1234567891', '1234567892', '1234567893', '1234567894',
+    '9999999901', '9999999902', '9999999903', '9999999904'
+  )
+);
+
+DELETE FROM merchant_redemptions WHERE merchant_id IN (
+  SELECT id FROM users WHERE phone_number IN (
+    '1234567890', '1234567891', '1234567892', '1234567893', '1234567894',
+    '9999999901', '9999999902', '9999999903', '9999999904'
+  )
+);
+
+DELETE FROM payment_requests WHERE merchant_id IN (
+  SELECT id FROM users WHERE phone_number IN (
+    '1234567890', '1234567891', '1234567892', '1234567893', '1234567894',
+    '9999999901', '9999999902', '9999999903', '9999999904'
+  )
+);
+
+DELETE FROM payment_requests WHERE approved_by IN (
+  SELECT id FROM users WHERE phone_number IN (
+    '1234567890', '1234567891', '1234567892', '1234567893', '1234567894',
+    '9999999901', '9999999902', '9999999903', '9999999904'
+  )
+);
+
+DELETE FROM reports WHERE user_id IN (
+  SELECT id FROM users WHERE phone_number IN (
+    '1234567890', '1234567891', '1234567892', '1234567893', '1234567894',
+    '9999999901', '9999999902', '9999999903', '9999999904'
+  )
+);
+
+DELETE FROM user_qr_codes WHERE user_id IN (
+  SELECT id FROM users WHERE phone_number IN (
+    '1234567890', '1234567891', '1234567892', '1234567893', '1234567894',
+    '9999999901', '9999999902', '9999999903', '9999999904'
+  )
+);
+
+DELETE FROM notifications WHERE user_id IN (
+  SELECT id FROM users WHERE phone_number IN (
+    '1234567890', '1234567891', '1234567892', '1234567893', '1234567894',
+    '9999999901', '9999999902', '9999999903', '9999999904'
+  )
+);
+
+-- Now safe to delete old test users
+DELETE FROM users WHERE phone_number IN (
+  '1234567890', '1234567891', '1234567892', '1234567893', '1234567894',
+  '9999999901', '9999999902', '9999999903', '9999999904'
+);
+
+-- Create new test users with clean credentials
+-- Admin Account
 INSERT INTO users (phone_number, role, password_hash, coin_balance, merchant_coins) VALUES
-('1234567890', 'tourist', 'test123', 100, 0),
-('1234567891', 'merchant', 'test123', 0, 50),
-('1234567892', 'beach_authority', 'test123', 0, 0),
-('1234567893', 'municipality', 'test123', 0, 0),
-('1234567894', 'admin', 'test123', 0, 0)
+('9876543210', 'admin', 'admin@123', 0, 0)
+ON CONFLICT (phone_number) DO UPDATE SET
+  role = EXCLUDED.role,
+  password_hash = EXCLUDED.password_hash;
+
+-- Tourist Account
+INSERT INTO users (phone_number, role, password_hash, coin_balance, merchant_coins) VALUES
+('9876543211', 'tourist', 'tourist@123', 100, 0)
 ON CONFLICT (phone_number) DO UPDATE SET
   coin_balance = EXCLUDED.coin_balance,
   merchant_coins = EXCLUDED.merchant_coins;
 
--- Assign beach to authorities
-UPDATE users SET assigned_beach_id = 'test_beach' 
-WHERE role IN ('beach_authority', 'municipality') 
-AND phone_number IN ('1234567892', '1234567893');
+-- Merchant Account
+INSERT INTO users (phone_number, role, password_hash, coin_balance, merchant_coins) VALUES
+('9876543212', 'merchant', 'merchant@123', 0, 50)
+ON CONFLICT (phone_number) DO UPDATE SET
+  coin_balance = EXCLUDED.coin_balance,
+  merchant_coins = EXCLUDED.merchant_coins;
+
+-- Beach Authority Account
+INSERT INTO users (phone_number, role, password_hash, coin_balance, merchant_coins, assigned_beach_id) VALUES
+('9876543213', 'beach_authority', 'beach@123', 0, 0, 'test_beach')
+ON CONFLICT (phone_number) DO UPDATE SET
+  assigned_beach_id = EXCLUDED.assigned_beach_id;
+
+-- Municipality Account
+INSERT INTO users (phone_number, role, password_hash, coin_balance, merchant_coins, assigned_beach_id) VALUES
+('9876543214', 'municipality', 'municipality@123', 0, 0, 'test_beach')
+ON CONFLICT (phone_number) DO UPDATE SET
+  assigned_beach_id = EXCLUDED.assigned_beach_id;
 
 -- Create test bin at your location (REPLACE COORDINATES)
 INSERT INTO bins (bin_id, qr_code, gps_lat, gps_lng, status, beach_id) VALUES
@@ -39,7 +144,7 @@ DO $$
 DECLARE
   merchant_user_id UUID;
 BEGIN
-  SELECT id INTO merchant_user_id FROM users WHERE phone_number = '1234567891';
+  SELECT id INTO merchant_user_id FROM users WHERE phone_number = '9876543212';
   
   INSERT INTO beach_merchants (
     merchant_id, beach_id, business_name, business_type, 
@@ -48,7 +153,7 @@ BEGIN
   ) VALUES (
     merchant_user_id, 'test_beach', 'Test Merchant Shop', 'Restaurant',
     'Test Address, Your Location', 12.3508111, 76.6123884,
-    '1234567891', 'Test merchant for development', true
+    '9876543212', 'Test merchant for development', true
   ) ON CONFLICT (merchant_id, beach_id) DO UPDATE SET
     shop_gps_lat = 12.3508111,
     shop_gps_lng = 76.6123884,
@@ -307,9 +412,9 @@ $$ LANGUAGE plpgsql;
 -- Instructions for testing
 SELECT 'TEST SETUP COMPLETE!' as status,
        'IMPORTANT: Update coordinates in this file with your actual location before running!' as instruction,
-       'Test Users Created:' as users_info,
-       '1234567890 - Tourist (100 coins)' as tourist,
-       '1234567891 - Merchant (50 merchant coins)' as merchant,
-       '1234567892 - Beach Authority' as beach_auth,
-       '1234567893 - Municipality' as municipality,
-       '1234567894 - Admin' as admin;
+       'Test Users Created (Old users deleted):' as users_info,
+       '9876543210 - Admin (Password: admin@123)' as admin,
+       '9876543211 - Tourist (Password: tourist@123, 100 coins)' as tourist,
+       '9876543212 - Merchant (Password: merchant@123, 50 merchant coins)' as merchant,
+       '9876543213 - Beach Authority (Password: beach@123)' as beach_auth,
+       '9876543214 - Municipality (Password: municipality@123)' as municipality;

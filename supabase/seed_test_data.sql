@@ -1,99 +1,15 @@
 -- Seed Test Data for User Testing
+-- This file is now deprecated - use test_setup.sql instead
 -- Location: 12.900792, 74.987995
 
--- 1. Insert Test Beach
-INSERT INTO beaches (beach_id, name, district, gps_lat, gps_lng, status)
-VALUES (
-  'test_beach_location',
-  'Test Beach Location',
-  'Test District',
-  12.900792,
-  74.987995,
-  'active'
-) ON CONFLICT (beach_id) DO NOTHING;
+-- Delete old test users from this file
+DELETE FROM users WHERE phone_number IN (
+  '9999999901', '9999999902', '9999999903', '9999999904'
+);
 
--- 2. Insert Test Users
+-- Note: All test users are now managed in test_setup.sql
+-- Run test_setup.sql instead of this file for the latest test data
 
--- Merchant
-INSERT INTO users (phone_number, password_hash, role, coin_balance, pending_coins, created_at)
-VALUES (
-  '9999999901',
-  'password',
-  'merchant',
-  1000,
-  0,
-  NOW()
-) ON CONFLICT (phone_number) DO NOTHING;
-
--- Municipality (Assigned to Test Beach)
-INSERT INTO users (phone_number, password_hash, role, coin_balance, pending_coins, assigned_beach_id, created_at)
-VALUES (
-  '9999999902',
-  'password',
-  'municipality',
-  0,
-  0,
-  'test_beach_location',
-  NOW()
-) ON CONFLICT (phone_number) DO NOTHING;
-
--- Beach Authority (Assigned to Test Beach)
-INSERT INTO users (phone_number, password_hash, role, coin_balance, pending_coins, assigned_beach_id, created_at)
-VALUES (
-  '9999999903',
-  'password',
-  'beach_authority',
-  0,
-  0,
-  'test_beach_location',
-  NOW()
-) ON CONFLICT (phone_number) DO NOTHING;
-
--- Tourist (Regular User)
-INSERT INTO users (phone_number, password_hash, role, coin_balance, pending_coins, created_at)
-VALUES (
-  '9999999904',
-  'password',
-  'tourist',
-  100,
-  0,
-  NOW()
-) ON CONFLICT (phone_number) DO NOTHING;
-
--- 3. Insert Test Bin
-INSERT INTO bins (bin_id, qr_code, gps_lat, gps_lng, status, beach_id, created_at)
-VALUES (
-  'BIN-TEST-001',
-  'karavali-bin-test-001',
-  12.900792,
-  74.987995,
-  'empty',
-  'test_beach_location',
-  NOW()
-) ON CONFLICT (bin_id) DO NOTHING;
-
--- 4. Link Merchant to Beach (Required for merchant features)
-INSERT INTO beach_merchants (
-  merchant_id,
-  beach_id,
-  business_name,
-  business_type,
-  shop_address,
-  shop_gps_lat,
-  shop_gps_lng,
-  contact_phone,
-  is_active
-)
-SELECT 
-  id, 
-  'test_beach_location',
-  'Test Merchant Shop',
-  'Cafe',
-  '123 Beach Road',
-  12.900792,
-  74.987995,
-  '9999999901',
-  true
-FROM users 
-WHERE phone_number = '9999999901'
-ON CONFLICT (merchant_id, beach_id) DO NOTHING;
+SELECT 'DEPRECATED: Use test_setup.sql instead' as notice,
+       'This file has been deprecated in favor of test_setup.sql' as message,
+       'All old test users (9999999901-9999999904) have been deleted' as cleanup_status;

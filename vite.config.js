@@ -30,12 +30,18 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}']
+      },
+      // Don't inject workbox into firebase-messaging-sw.js
+      injectManifest: {
+        injectionPoint: undefined
       }
     })
   ],
   server: {
     port: 3000,
     open: true
-  }
+  },
+  // Ensure service worker files are copied to dist
+  publicDir: 'public'
 })
 

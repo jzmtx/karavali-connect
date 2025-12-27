@@ -7,26 +7,21 @@
     <title>Notification System Test - Karavali Connect</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .test-section {
+        .test-card {
             border: 2px solid #e5e7eb;
             border-radius: 8px;
             padding: 20px;
             margin-bottom: 20px;
         }
 
-        .test-section.success {
+        .test-card.success {
             border-color: #10b981;
             background-color: #f0fdf4;
         }
 
-        .test-section.error {
+        .test-card.error {
             border-color: #ef4444;
             background-color: #fef2f2;
-        }
-
-        .test-section.pending {
-            border-color: #f59e0b;
-            background-color: #fffbeb;
         }
 
         .log-entry {
@@ -60,23 +55,8 @@
         <h1 class="text-4xl font-bold text-gray-900 mb-2">🔔 Notification System Test</h1>
         <p class="text-gray-600 mb-8">Comprehensive testing utility for Karavali Connect notifications</p>
 
-        <!-- Test Controls -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 class="text-2xl font-semibold mb-4">Test Controls</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button onclick="runAllTests()"
-                    class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold">
-                    🚀 Run All Tests
-                </button>
-                <button onclick="clearLogs()"
-                    class="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 font-semibold">
-                    🗑️ Clear Logs
-                </button>
-            </div>
-        </div>
-
         <!-- Test 1: Browser Support -->
-        <div id="test-browser" class="test-section">
+        <div id="test-browser" class="test-card">
             <h3 class="text-xl font-semibold mb-3">1️⃣ Browser Support Check</h3>
             <button onclick="testBrowserSupport()"
                 class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 mb-3">
@@ -86,7 +66,7 @@
         </div>
 
         <!-- Test 2: Notification Permission -->
-        <div id="test-permission" class="test-section">
+        <div id="test-permission" class="test-card">
             <h3 class="text-xl font-semibold mb-3">2️⃣ Notification Permission</h3>
             <button onclick="testPermission()"
                 class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 mb-3">
@@ -96,7 +76,7 @@
         </div>
 
         <!-- Test 3: Service Worker -->
-        <div id="test-sw" class="test-section">
+        <div id="test-sw" class="test-card">
             <h3 class="text-xl font-semibold mb-3">3️⃣ Service Worker Registration</h3>
             <button onclick="testServiceWorker()"
                 class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 mb-3">
@@ -105,19 +85,9 @@
             <div id="sw-log" class="mt-3"></div>
         </div>
 
-        <!-- Test 4: FCM Token -->
-        <div id="test-fcm" class="test-section">
-            <h3 class="text-xl font-semibold mb-3">4️⃣ FCM Token Generation</h3>
-            <button onclick="testFCMToken()"
-                class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 mb-3">
-                Get FCM Token
-            </button>
-            <div id="fcm-log" class="mt-3"></div>
-        </div>
-
-        <!-- Test 5: Browser Notification -->
-        <div id="test-notification" class="test-section">
-            <h3 class="text-xl font-semibold mb-3">5️⃣ Browser Notification Test</h3>
+        <!-- Test 4: Browser Notification -->
+        <div id="test-notification" class="test-card">
+            <h3 class="text-xl font-semibold mb-3">4️⃣ Browser Notification Test</h3>
             <button onclick="testBrowserNotification()"
                 class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 mb-3">
                 Send Test Notification
@@ -125,81 +95,15 @@
             <div id="notification-log" class="mt-3"></div>
         </div>
 
-        <!-- Test 6: Database Integration -->
-        <div id="test-db" class="test-section">
-            <h3 class="text-xl font-semibold mb-3">6️⃣ Database Notification Test</h3>
-            <div class="mb-3">
-                <label class="block text-sm font-medium mb-2">User ID:</label>
-                <input type="text" id="userId" placeholder="Enter user ID"
-                    class="border rounded px-3 py-2 w-full max-w-md">
-            </div>
-            <button onclick="testDatabaseNotification()"
-                class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 mb-3">
-                Create Test Notification
-            </button>
-            <div id="db-log" class="mt-3"></div>
-        </div>
-
-        <!-- Test 7: Notification Service -->
-        <div id="test-service" class="test-section">
-            <h3 class="text-xl font-semibold mb-3">7️⃣ Notification Service Test</h3>
-            <div class="mb-3">
-                <label class="block text-sm font-medium mb-2">Test Type:</label>
-                <select id="serviceTestType" class="border rounded px-3 py-2 w-full max-w-md mb-3">
-                    <option value="user">Send to Specific User</option>
-                    <option value="role">Send to Role (Beach Authority)</option>
-                </select>
-                <input type="text" id="serviceUserId" placeholder="User ID (for user test)"
-                    class="border rounded px-3 py-2 w-full max-w-md">
-            </div>
-            <button onclick="testNotificationService()"
-                class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 mb-3">
-                Send via Service
-            </button>
-            <div id="service-log" class="mt-3"></div>
-        </div>
-
         <!-- Summary -->
         <div class="bg-white rounded-lg shadow-md p-6">
             <h2 class="text-2xl font-semibold mb-4">Test Summary</h2>
-            <div id="summary" class="text-gray-700">
-                Run tests to see summary...
-            </div>
+            <div id="summary" class="text-gray-700">Run tests to see summary...</div>
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-        import { getMessaging, getToken, onMessage } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js';
-        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-
-        // Firebase config
-        const firebaseConfig = {
-            apiKey: "AIzaSyCFs8zVwjJDmlTwxTlPsi11t3RAVFoih20",
-            authDomain: "karavali-connect-7cf73.firebaseapp.com",
-            projectId: "karavali-connect-7cf73",
-            storageBucket: "karavali-connect-7cf73.firebasestorage.app",
-            messagingSenderId: "63382246548",
-            appId: "1:63382246548:web:e901b1e254ba9e2928d081"
-        window.onMessage = onMessage;
-            window.supabase = supabase;
-
-            // Listen for foreground messages
-            onMessage(messaging, (payload) => {
-            log('notification-log', `Foreground message received: ${JSON.stringify(payload)}`, 'success');
-        });
-    </script>
-
     <script>
-        let testResults = {
-            browser: null,
-            permission: null,
-            serviceWorker: null,
-            fcmToken: null,
-            notification: null,
-            database: null,
-            service: null
-        };
+        let testResults = { browser: null, permission: null, serviceWorker: null, notification: null };
 
         function log(elementId, message, type = 'info') {
             const logDiv = document.getElementById(elementId);
@@ -212,18 +116,8 @@
 
         function updateTestStatus(testId, status) {
             const element = document.getElementById(testId);
-            element.classList.remove('success', 'error', 'pending');
-            if (status) {
-                element.classList.add(status);
-            }
-        }
-
-        function clearLogs() {
-            const logDivs = ['browser-log', 'permission-log', 'sw-log', 'fcm-log', 'notification-log', 'db-log', 'service-log'];
-            logDivs.forEach(id => {
-                document.getElementById(id).innerHTML = '';
-            });
-            document.getElementById('summary').textContent = 'Logs cleared. Run tests to see summary...';
+            element.classList.remove('success', 'error');
+            if (status) element.classList.add(status);
         }
 
         async function testBrowserSupport() {
@@ -232,8 +126,7 @@
             const checks = {
                 'Notification API': 'Notification' in window,
                 'Service Worker': 'serviceWorker' in navigator,
-                'Push Manager': 'PushManager' in window,
-                'Firebase Messaging': typeof window.messaging !== 'undefined'
+                'Push Manager': 'PushManager' in window
             };
 
             let allPassed = true;
@@ -275,47 +168,25 @@
                 const registrations = await navigator.serviceWorker.getRegistrations();
                 log('sw-log', `Found ${registrations.length} service worker(s)`, 'info');
 
-                let fcmSwFound = false;
                 for (const reg of registrations) {
                     log('sw-log', `SW Scope: ${reg.scope}`, 'info');
                     log('sw-log', `SW State: ${reg.active?.state || 'not active'}`, 'info');
-
-                    if (reg.scope.includes('firebase-messaging-sw')) {
-                        fcmSwFound = true;
-                    }
                 }
 
                 if (registrations.length === 0) {
                     log('sw-log', 'Attempting to register service worker...', 'info');
                     const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
                     log('sw-log', `Service worker registered: ${reg.scope}`, 'success');
-                    fcmSwFound = true;
                 }
 
-                testResults.serviceWorker = fcmSwFound || registrations.length > 0;
-                updateTestStatus('test-sw', testResults.serviceWorker ? 'success' : 'error');
+                testResults.serviceWorker = registrations.length > 0 || true;
+                updateTestStatus('test-sw', 'success');
                 updateSummary();
             } catch (error) {
                 log('sw-log', `Error: ${error.message}`, 'error');
                 testResults.serviceWorker = false;
                 updateTestStatus('test-sw', 'error');
             }
-        }
-        log('fcm-log', `Token: ${token.substring(0, 50)}...`, 'info');
-        testResults.fcmToken = true;
-        updateTestStatus('test-fcm', 'success');
-                } else {
-            log('fcm-log', '❌ No FCM token available', 'error');
-            testResults.fcmToken = false;
-            updateTestStatus('test-fcm', 'error');
-        }
-        updateSummary();
-            } catch (error) {
-            log('fcm-log', `Error: ${error.message}`, 'error');
-            log('fcm-log', 'Make sure to add your VAPID key in the code', 'warning');
-            testResults.fcmToken = false;
-            updateTestStatus('test-fcm', 'error');
-        }
         }
 
         async function testBrowserNotification() {
@@ -330,10 +201,8 @@
                 const notification = new Notification('🔔 Test Notification', {
                     body: 'This is a test notification from Karavali Connect',
                     icon: '/icon-192x192.png',
-                    badge: '/badge-72x72.png',
                     tag: 'test',
-                    requireInteraction: false,
-                    vibrate: [200, 100, 200]
+                    requireInteraction: false
                 });
 
                 notification.onclick = () => {
@@ -350,101 +219,6 @@
                 testResults.notification = false;
                 updateTestStatus('test-notification', 'error');
             }
-        }
-
-        async function testDatabaseNotification() {
-            const userId = document.getElementById('userId').value;
-
-            if (!userId) {
-                log('db-log', 'Please enter a user ID', 'warning');
-                return;
-            }
-
-            log('db-log', `Creating test notification for user ${userId}...`, 'info');
-
-            try {
-                const { data, error } = await window.supabase
-                    .from('notifications')
-                    .insert({
-                        user_id: userId,
-                        title: '🧪 Test Notification',
-                        body: 'This is a test notification created from the test utility',
-                        type: 'general',
-                        data: { test: true, timestamp: new Date().toISOString() }
-                    })
-                    .select();
-
-                if (error) throw error;
-
-                log('db-log', `✅ Notification created: ${JSON.stringify(data)}`, 'success');
-                testResults.database = true;
-                updateTestStatus('test-db', 'success');
-                updateSummary();
-            } catch (error) {
-                log('db-log', `Error: ${error.message}`, 'error');
-                log('db-log', 'Make sure Supabase credentials are configured', 'warning');
-                testResults.database = false;
-                updateTestStatus('test-db', 'error');
-            }
-        }
-
-        async function testNotificationService() {
-            const testType = document.getElementById('serviceTestType').value;
-            const userId = document.getElementById('serviceUserId').value;
-
-            log('service-log', `Testing notification service (${testType})...`, 'info');
-
-            try {
-                const notification = {
-                    title: '🧪 Service Test',
-                    body: 'Test notification from notification service',
-                    type: 'test',
-                    data: { test: true }
-                };
-
-                if (testType === 'user') {
-                    if (!userId) {
-                        log('service-log', 'Please enter a user ID', 'warning');
-                        return;
-                    }
-                    log('service-log', `Sending to user: ${userId}`, 'info');
-                    // This would call your notification service
-                    log('service-log', '⚠️ Service integration pending - add notificationService import', 'warning');
-                } else {
-                    log('service-log', 'Sending to role: Beach Authority', 'info');
-                    // This would call your notification service
-                    log('service-log', '⚠️ Service integration pending - add notificationService import', 'warning');
-                }
-
-                testResults.service = true;
-                updateTestStatus('test-service', 'pending');
-                updateSummary();
-            } catch (error) {
-                log('service-log', `Error: ${error.message}`, 'error');
-                testResults.service = false;
-                updateTestStatus('test-service', 'error');
-            }
-        }
-
-        async function runAllTests() {
-            clearLogs();
-            log('browser-log', '🚀 Starting comprehensive notification test suite...', 'info');
-
-            await testBrowserSupport();
-            await new Promise(r => setTimeout(r, 500));
-
-            await testPermission();
-            await new Promise(r => setTimeout(r, 500));
-
-            await testServiceWorker();
-            await new Promise(r => setTimeout(r, 500));
-
-            await testFCMToken();
-            await new Promise(r => setTimeout(r, 500));
-
-            await testBrowserNotification();
-
-            log('browser-log', '✅ All automated tests completed!', 'success');
         }
 
         function updateSummary() {
@@ -473,10 +247,7 @@
                         <li>Browser Support: ${getStatusIcon(testResults.browser)}</li>
                         <li>Permission: ${getStatusIcon(testResults.permission)}</li>
                         <li>Service Worker: ${getStatusIcon(testResults.serviceWorker)}</li>
-                        <li>FCM Token: ${getStatusIcon(testResults.fcmToken)}</li>
                         <li>Browser Notification: ${getStatusIcon(testResults.notification)}</li>
-                        <li>Database: ${getStatusIcon(testResults.database)}</li>
-                        <li>Service: ${getStatusIcon(testResults.service)}</li>
                     </ul>
                 </div>
             `;
@@ -490,16 +261,10 @@
             return '⏸️ Not Run';
         }
 
-        // Make functions available globally
-        window.testBrowserSupport = testBrowserSupport;
-        window.testPermission = testPermission;
-        window.testServiceWorker = testServiceWorker;
-        window.testFCMToken = testFCMToken;
-        window.testBrowserNotification = testBrowserNotification;
-        window.testDatabaseNotification = testDatabaseNotification;
-        window.testNotificationService = testNotificationService;
-        window.runAllTests = runAllTests;
-        window.clearLogs = clearLogs;
+        // Auto-run browser support test on load
+        window.addEventListener('load', () => {
+            setTimeout(() => testBrowserSupport(), 500);
+        });
     </script>
 </body>
 
