@@ -8,6 +8,8 @@ export default function NotificationBell({ userId }) {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
+        if (!userId) return;
+
         loadNotifications();
 
         // Poll for new notifications every 30 seconds
@@ -17,12 +19,19 @@ export default function NotificationBell({ userId }) {
     }, [userId]);
 
     const loadNotifications = async () => {
-        const count = await notificationService.getUnreadCount(userId);
-        setUnreadCount(count);
+        if (!userId) return;
 
-        if (showDropdown) {
-            const notifs = await notificationService.getNotifications(userId, 10);
-            setNotifications(notifs);
+        try {
+            const count = await notificationService.getUnreadCount(userId);
+            setUnreadCount(count);
+
+            if (showDropdown) {
+                const notifs = await notificationService.getNotifications(userId, 10);
+                setNotifications(notifs);
+            }
+        } catch (error) {
+            console.error('Error loading notifications:', error);
+            // Silently fail - bell will still be visible
         }
     };
 
@@ -31,25 +40,33 @@ export default function NotificationBell({ userId }) {
 
         if (!showDropdown) {
             setLoading(true);
-            const notifs = await notificationService.getNotifications(userId, 10);
-            setNotifications(notifs);
+            try {
+                const notifs = await notificationService.getNotifications(userId, 10);
+                setNotifications(notifs);
+            } catch (error) {
+                console.error('Error fetching notifications:', error);
+            }
             setLoading(false);
         }
     };
 
     const handleNotificationClick = async (notification) => {
-        // Mark as read
-        await notificationService.markAsRead(notification.id);
+        try {
+            // Mark as read
+            await notificationService.markAsRead(notification.id);
 
-        // Update UI
-        setNotifications(prev =>
-            prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
-        );
-        setUnreadCount(prev => Math.max(0, prev - 1));
+            // Update UI
+            setNotifications(prev =>
+                prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
+            );
+            setUnreadCount(prev => Math.max(0, prev - 1));
 
-        // Navigate based on notification type
-        if (notification.data?.url) {
-            window.location.href = notification.data.url;
+            // Navigate based on notification type
+            if (notification.data?.url) {
+                window.location.href = notification.data.url;
+            }
+        } catch (error) {
+            console.error('Error handling notification click:', error);
         }
     };
 
