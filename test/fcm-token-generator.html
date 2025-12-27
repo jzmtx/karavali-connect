@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FCM Token Generator - Karavali Connect</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen p-8">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-lg p-8 mb-6">
+            <h1 class="text-4xl font-bold text-gray-900 mb-2">🔑 FCM Token Generator</h1>
+            <p class="text-gray-600">Generate and test Firebase Cloud Messaging tokens for Karavali Connect</p>
+        </div>
+
+        <!-- Instructions -->
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
+            <h3 class="font-semibold text-blue-900 mb-2">📋 How to Use:</h3>
+            <ol class="list-decimal list-inside text-blue-800 space-y-1 text-sm">
+                <li>Click "Generate FCM Token" button below</li>
+                <li>Grant notification permission when prompted</li>
+                <li>Copy the generated token</li>
+                <li>Use it to send test notifications from Firebase Console</li>
+            </ol>
+        </div>
+
+        <!-- Main Card -->
+        <div class="bg-white rounded-lg shadow-lg p-8 mb-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-semibold text-gray-800">Token Generator</h2>
+                <div id="status-badge" class="px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-600">
+                    Ready
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex gap-3 mb-6">
+                <button onclick="generateToken()"
+                    class="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-lg hover:from-indigo-700 hover:to-purple-700 font-semibold shadow-md transition-all duration-200 hover:shadow-lg">
+                    🔑 Generate FCM Token
+                </button>
+                <button onclick="testNotification()" id="test-btn" disabled
+                    class="flex-1 bg-gray-300 text-gray-500 px-6 py-3 rounded-lg font-semibold cursor-not-allowed">
+                    🔔 Send Test Notification
+                </button>
+            </div>
+
+            <!-- Result Area -->
+            <div id="result" class="hidden">
+                <!-- Token Display -->
+                <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="font-semibold text-gray-700">Your FCM Token:</label>
+                        <button onclick="copyToken()"
+                            class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm font-medium transition-colors">
+                            📋 Copy Token
+                        </button>
+                    </div>
+                    <textarea id="token-display"
+                        class="w-full h-32 p-3 border border-gray-300 rounded font-mono text-xs bg-white resize-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        readonly onclick="this.select()"></textarea>
+                </div>
+
+                <!-- Token Info -->
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                        <div class="text-green-600 text-sm font-medium mb-1">Permission Status</div>
+                        <div id="permission-status" class="text-green-900 font-semibold">Granted ✅</div>
+                    </div>
+                    <div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                        <div class="text-purple-600 text-sm font-medium mb-1">Service Worker</div>
+                        <div id="sw-status" class="text-purple-900 font-semibold">Active ✅</div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-lg">
+                    <h3 class="font-semibold text-gray-800 mb-3">🚀 Quick Actions:</h3>
+                    <div class="space-y-2">
+                        <a href="https://console.firebase.google.com/project/karavali-connect-7cf73/messaging"
+                            target="_blank"
+                            class="block bg-white p-3 rounded border border-gray-200 hover:border-indigo-400 hover:shadow-md transition-all">
+                            <div class="flex items-center justify-between">
+                                <span class="font-medium text-gray-800">📨 Send from Firebase Console</span>
+                                <span class="text-indigo-600 text-sm">Open →</span>
+                            </div>
+                        </a>
+                        <button onclick="showCurlCommand()"
+                            class="w-full bg-white p-3 rounded border border-gray-200 hover:border-purple-400 hover:shadow-md transition-all text-left">
+                            <div class="flex items-center justify-between">
+                                <span class="font-medium text-gray-800">💻 Get cURL Command</span>
+                                <span class="text-purple-600 text-sm">Show →</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error Display -->
+            <div id="error" class="hidden bg-red-50 border border-red-200 rounded-lg p-4">
+                <div class="flex items-start">
+                    <span class="text-2xl mr-3">❌</span>
+                    <div>
+                        <h3 class="font-semibold text-red-900 mb-1">Error</h3>
+                        <p id="error-message" class="text-red-700 text-sm"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading -->
+            <div id="loading" class="hidden text-center py-8">
+                <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+                <p class="mt-4 text-gray-600">Generating token...</p>
+            </div>
+        </div>
+
+        <!-- cURL Command Modal -->
+        <div id="curl-modal" class="hidden bg-white rounded-lg shadow-lg p-6">
+            <h3 class="text-xl font-semibold mb-4">💻 cURL Command for Testing</h3>
+            <div class="bg-gray-900 text-green-400 p-4 rounded-lg mb-4 overflow-x-auto">
+                <pre id="curl-command" class="text-xs font-mono whitespace-pre-wrap"></pre>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="copyCurl()"
+                    class="flex-1 bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">
+                    📋 Copy Command
+                </button>
+                <button onclick="hideCurlCommand()"
+                    class="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">
+                    Close
+                </button>
+            </div>
+        </div>
+
+        <!-- Debug Console -->
+        <div class="bg-gray-900 text-gray-100 rounded-lg shadow-lg p-6">
+            <h3 class="text-lg font-semibold mb-3 text-white">🐛 Debug Console</h3>
+            <div id="console" class="space-y-1 font-mono text-xs max-h-64 overflow-y-auto">
+                <div class="text-gray-400">[Ready] Waiting for action...</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getMessaging, getToken, onMessage } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCFs8zVwjJDmlTwxTlPsi11t3RAVFoih20",
+            authDomain: "karavali-connect-7cf73.firebaseapp.com",
+            projectId: "karavali-connect-7cf73",
+            storageBucket: "karavali-connect-7cf73.firebasestorage.app",
+            messagingSenderId: "63382246548",
+            appId: "1:63382246548:web:e901b1e254ba9e2928d081"
+        };
+
+        let currentToken = null;
+        let messaging = null;
+
+        // Initialize Firebase
+        try {
+            const app = initializeApp(firebaseConfig);
+            messaging = getMessaging(app);
+            logConsole('Firebase initialized successfully', 'success');
+
+            // Listen for foreground messages
+            onMessage(messaging, (payload) => {
+                logConsole('Foreground message received!', 'success');
+                console.log('Message payload:', payload);
+                showNotification(payload);
+            });
+        } catch (error) {
+            logConsole(`Firebase init error: ${error.message}`, 'error');
+        }
+
+        function logConsole(message, type = 'info') {
+            const consoleDiv = document.getElementById('console');
+            const timestamp = new Date().toLocaleTimeString();
+            const colors = {
+                info: 'text-blue-400',
+                success: 'text-green-400',
+                error: 'text-red-400',
+                warning: 'text-yellow-400'
+            };
+
+            const entry = document.createElement('div');
+            entry.className = colors[type] || colors.info;
+            entry.textContent = `[${timestamp}] ${message}`;
+            consoleDiv.appendChild(entry);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
+
+        function updateStatus(text, color = 'gray') {
+            const badge = document.getElementById('status-badge');
+            badge.textContent = text;
+            badge.className = `px-3 py-1 rounded-full text-sm font-medium bg-${color}-100 text-${color}-600`;
+        }
+
+        window.generateToken = async function () {
+            const resultDiv = document.getElementById('result');
+            const errorDiv = document.getElementById('error');
+            const loadingDiv = document.getElementById('loading');
+
+            // Hide previous results
+            resultDiv.classList.add('hidden');
+            errorDiv.classList.add('hidden');
+            loadingDiv.classList.remove('hidden');
+
+            updateStatus('Generating...', 'yellow');
+            logConsole('Starting token generation...', 'info');
+
+            try {
+                // Check service worker
+                logConsole('Checking service worker...', 'info');
+                const registrations = await navigator.serviceWorker.getRegistrations();
+
+                if (registrations.length === 0) {
+                    logConsole('Registering service worker...', 'warning');
+                    await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                    logConsole('Service worker registered', 'success');
+                }
+
+                // Request permission
+                logConsole('Requesting notification permission...', 'info');
+                const permission = await Notification.requestPermission();
+
+                if (permission !== 'granted') {
+                    throw new Error('Notification permission denied');
+                }
+
+                logConsole('Permission granted', 'success');
+
+                // VAPID key from environment
+                const vapidKey = 'BItm6agIZhgFgTGQnbcdFqr_netJLR_FRPi6LNbcfN0IDDr7MqUrLWLFYKMSw68d50U173MXYxBNl0UVe_FSU3c';
+
+                logConsole('Generating FCM token...', 'info');
+
+                // Get FCM token
+                const token = await getToken(messaging, { vapidKey });
+
+                if (token) {
+                    currentToken = token;
+                    document.getElementById('token-display').value = token;
+
+                    loadingDiv.classList.add('hidden');
+                    resultDiv.classList.remove('hidden');
+
+                    updateStatus('Active', 'green');
+                    logConsole('Token generated successfully!', 'success');
+
+                    // Enable test button
+                    const testBtn = document.getElementById('test-btn');
+                    testBtn.disabled = false;
+                    testBtn.className = 'flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-lg hover:from-green-700 hover:to-emerald-700 font-semibold shadow-md transition-all duration-200 hover:shadow-lg';
+
+                    // Save to localStorage for later use
+                    localStorage.setItem('fcm_token', token);
+                } else {
+                    throw new Error('No token available');
+                }
+            } catch (error) {
+                loadingDiv.classList.add('hidden');
+                errorDiv.classList.remove('hidden');
+                document.getElementById('error-message').textContent = error.message;
+
+                updateStatus('Error', 'red');
+                logConsole(`Error: ${error.message}`, 'error');
+                console.error('Token generation error:', error);
+            }
+        };
+
+        window.copyToken = function () {
+            const tokenDisplay = document.getElementById('token-display');
+            tokenDisplay.select();
+            navigator.clipboard.writeText(tokenDisplay.value);
+
+            logConsole('Token copied to clipboard!', 'success');
+
+            // Visual feedback
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = '✅ Copied!';
+            setTimeout(() => {
+                btn.textContent = originalText;
+            }, 2000);
+        };
+
+        window.testNotification = function () {
+            if (!currentToken) {
+                logConsole('No token available. Generate token first.', 'error');
+                return;
+            }
+
+            logConsole('Sending test notification...', 'info');
+
+            // Send a local notification
+            if (Notification.permission === 'granted') {
+                const notification = new Notification('🔔 Test Notification', {
+                    body: 'This is a test notification from FCM Token Generator',
+                    icon: '/icon-192x192.png',
+                    badge: '/badge-72x72.png',
+                    tag: 'test',
+                    requireInteraction: false
+                });
+
+                notification.onclick = () => {
+                    logConsole('Notification clicked!', 'success');
+                    notification.close();
+                };
+
+                logConsole('Test notification sent!', 'success');
+            }
+        };
+
+        window.showCurlCommand = function () {
+            if (!currentToken) {
+                logConsole('Generate token first', 'error');
+                return;
+            }
+
+            const curlCommand = `curl -X POST https://fcm.googleapis.com/fcm/send \\
+  -H "Authorization: key=YOUR_SERVER_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "to": "${currentToken}",
+    "notification": {
+      "title": "Test from cURL",
+      "body": "This is a test notification",
+      "icon": "/icon-192x192.png"
+    },
+    "data": {
+      "type": "test",
+      "url": "/"
+    }
+  }'`;
+
+            document.getElementById('curl-command').textContent = curlCommand;
+            document.getElementById('curl-modal').classList.remove('hidden');
+            logConsole('cURL command displayed', 'info');
+        };
+
+        window.hideCurlCommand = function () {
+            document.getElementById('curl-modal').classList.add('hidden');
+        };
+
+        window.copyCurl = function () {
+            const curlCommand = document.getElementById('curl-command').textContent;
+            navigator.clipboard.writeText(curlCommand);
+            logConsole('cURL command copied!', 'success');
+        };
+
+        function showNotification(payload) {
+            const title = payload.notification?.title || 'Karavali Connect';
+            const options = {
+                body: payload.notification?.body || 'New notification',
+                icon: payload.notification?.icon || '/icon-192x192.png',
+                data: payload.data
+            };
+
+            new Notification(title, options);
+        }
+
+        // Check for existing token on load
+        window.addEventListener('load', () => {
+            const savedToken = localStorage.getItem('fcm_token');
+            if (savedToken) {
+                logConsole('Found saved token in localStorage', 'info');
+            }
+        });
+    </script>
+</body>
+
+</html>
